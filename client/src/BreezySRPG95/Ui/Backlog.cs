@@ -5,38 +5,60 @@ using Microsoft.Xna.Framework.Graphics;
 namespace BreezySRPG95.Ui;
 
 /// <summary>
-/// Text backlog (modern): every message shown since the title, newest at the bottom. Mouse wheel up (or the
-/// backlog key) opens it and scrolls back; wheel down scrolls forward and closes it past the newest line;
-/// Cancel or a click closes it. The gilded skin lays it out by message: each one's text on the right and its
-/// speaker's name box at its bottom left, a gold divider between them, scrolling a message at a time.
+/// Text backlog (modern): every message shown since the title, newest at the bottom, over the dimmed screen. Mouse wheel
+/// up (or the backlog key) opens it and scrolls back a message at a time; wheel down scrolls forward and closes it past
+/// the newest; Cancel or a click closes it. A spoken message shows the face it was spoken with (flipped as it was), half
+/// size in a thin white frame, its text beside it (the speaker's 「名前：」 line left out: the face says who); narration has
+/// no frame, its text in the same column. A message is as tall as its frame or its text, so a long one pushes the next
+/// down.
 /// </summary>
 public sealed class Backlog(Ui ui)
 {
-    readonly List<string[]> _entries = new();
-    int _scroll;   // lines (gilded: messages) scrolled up from the bottom
+    /// <summary>A message as it was shown: its lines, and its face (0 none) and whether that was flipped.</summary>
+    readonly record struct Entry(string[] Lines, int Face, bool Flip);
+
+    readonly List<Entry> _entries = new();
+    int _scroll;   // messages scrolled up from the newest
     public bool Open { get; private set; }
 
-    const int Lines = 25, LineHeight = 16;
+    const int Top = 16, Bottom = 466;          // the list's room on the 640 × 480 screen
+    const int FrameX = 22, FaceSize = 64;      // the face at half its 128 px: whole pixels at a render scale of 2 and up
+    const int TextX = FrameX + FaceSize + 2 + 16, Gap = 16, TextTop = 2;
 
     public void Add(MessageView m)
     {
-        _entries.Add(m.Lines.Where(l => l.Length > 0).ToArray());
+        _entries.Add(new Entry(m.Lines.Where(l => l.Length > 0).ToArray(), m.Face, m.FaceFlip));
         if (_entries.Count > 300) _entries.RemoveAt(0);
     }
 
     public void Clear() { _entries.Clear(); Open = false; }
 
-    List<string> Flat()
+    /// <summary>The lines shown: a spoken message's without its 「名前：」 line (its face stands for the name).</summary>
+    IReadOnlyList<string> Text(Entry e) => e.Face > 0 && ui.Face(e.Face) is not null ? Ui.SplitSpeaker(e.Lines).Text : e.Lines;
+
+    bool Framed(Entry e) => e.Face > 0 && ui.Face(e.Face) is not null;
+
+    /// <summary>A message's height: its frame's or its text's, the taller.</summary>
+    int Height(Entry e)
     {
-        var lines = new List<string>();
-        foreach (var e in _entries) { lines.AddRange(e); lines.Add(""); }
-        if (lines.Count > 0) lines.RemoveAt(lines.Count - 1);
-        return lines;
+        int text = Math.Max(1, Text(e).Count) * Ui.LineHeight;
+        return Framed(e) ? Math.Max(FaceSize + 2, TextTop + text) : text;
     }
 
-    int MaxScroll => Ui.Gilded ? GildedMaxScroll() : Math.Max(0, Flat().Count - Lines);
+    /// <summary>How many of the newest messages can be scrolled past while older ones still fill the screen.</summary>
+    int MaxScroll()
+    {
+        int used = 0, fit = 0;
+        foreach (var e in _entries)
+        {
+            used += Height(e) + (fit > 0 ? Gap : 0);
+            if (used > Bottom - Top) break;
+            fit++;
+        }
+        return Math.Max(0, _entries.Count - fit);
+    }
 
-    /// <summary>Wheel notches: positive = up (back in time).</summary>
+    /// <summary>Wheel notches: positive = up (back in time), a message each.</summary>
     public void Scroll(int notches)
     {
         if (_entries.Count == 0) return;
@@ -48,7 +70,7 @@ public sealed class Backlog(Ui ui)
             notches--;
         }
         int before = _scroll;
-        _scroll = Math.Clamp(_scroll + notches * (Ui.Gilded ? 1 : 3), 0, MaxScroll);
+        _scroll = Math.Clamp(_scroll + notches, 0, MaxScroll());
         if (notches < 0 && before == 0) Open = false;
     }
 
@@ -59,71 +81,37 @@ public sealed class Backlog(Ui ui)
     public void Draw(SpriteBatch sb)
     {
         if (!Open) return;
-        if (Ui.Gilded) { DrawGilded(sb); return; }
-        ui.Fill(sb, new Rectangle(0, 0, 640, 480), Color.Black * 0.5f);
-        var r = new Rectangle(48, 24, 544, Lines * LineHeight + 24);
-        ui.Panel(sb, r);
-        var lines = Flat();
-        int first = Math.Max(0, lines.Count - Lines - _scroll);
-        for (int k = 0; k < Lines && first + k < lines.Count; k++)
-            ui.SmallText.Get(lines[first + k])?.Draw(sb, new Vector2(r.X + 16, r.Y + 12 + k * LineHeight), Ui.PanelText);
-        // scroll position
-        if (lines.Count > Lines)
-        {
-            int track = r.Height - 16, h = Math.Max(16, track * Lines / lines.Count);
-            int y = r.Y + 8 + (track - h) * (MaxScroll - _scroll) / Math.Max(1, MaxScroll);
-            ui.Fill(sb, new Rectangle(r.Right - 10, y, 4, h), Ui.PanelText);
-        }
-    }
-
-    // ---------------- gilded layout ----------------
-
-    static readonly Rectangle GildedRect = new(36, 18, 568, 444);
-    const int GLine = 20, GTextX = 160, GPad = 10, GNameW = 136, GNameH = 26;
-    const int GTop = 18, GBottom = 14;   // the panel's inner margins above the oldest and below the newest message
-
-    /// <summary>A message's height in the gilded layout: its text lines, and room for the name box under the first.</summary>
-    static int EntryHeight(string[] lines)
-    {
-        var (name, text) = Ui.SplitSpeaker(lines);
-        int textH = Math.Max(1, text.Count) * GLine + 2 * GPad;
-        return Math.Max(textH, name is null ? 2 * GPad + GLine : GLine + GNameH + 2 * GPad);
-    }
-
-    /// <summary>How many of the newest messages can be scrolled past while older ones still fill the panel.</summary>
-    int GildedMaxScroll()
-    {
-        int room = GildedRect.Height - GTop - GBottom, used = 0, fit = 0;
-        foreach (var e in _entries)
-        {
-            used += EntryHeight(e);
-            if (used > room) break;
-            fit++;
-        }
-        return Math.Max(0, _entries.Count - fit);
-    }
-
-    void DrawGilded(SpriteBatch sb)
-    {
-        ui.Fill(sb, new Rectangle(0, 0, 640, 480), Color.Black * 0.45f);
-        var r = GildedRect;
-        ui.GildedBox(sb, r, Ui.GildedNavy, 0.84f);
-        int top = r.Y + GTop, y = r.Bottom - GBottom, i = _entries.Count - 1 - _scroll;
-        bool newest = true;
+        ui.Fill(sb, new Rectangle(0, 0, 640, 480), Color.Black * 0.62f);
+        var ink = new Color(242, 242, 242);
+        int y = Bottom, i = _entries.Count - 1 - _scroll;
         for (; i >= 0; i--)
         {
-            int h = EntryHeight(_entries[i]);
-            if (y - h < top) break;
+            var e = _entries[i];
+            int h = Height(e);
+            if (y - h < Top) break;
             y -= h;
-            if (!newest) ui.GoldRule(sb, r.X + 40, y + h, r.Width - 80);   // the divider under it
-            newest = false;
-            var (name, text) = Ui.SplitSpeaker(_entries[i]);
+            if (Framed(e) && ui.Face(e.Face) is { } face)
+            {
+                ui.Frame(sb, new Rectangle(FrameX, y, FaceSize + 2, FaceSize + 2), Color.White);
+                sb.Draw(face, new Rectangle(FrameX + 1, y + 1, FaceSize, FaceSize), null, Color.White, 0, Vector2.Zero,
+                    e.Flip ? SpriteEffects.FlipHorizontally : SpriteEffects.None, 0);
+            }
+            var text = Text(e);
             for (int k = 0; k < text.Count; k++)
-                ui.ShadowText(sb, ui.Text, text[k], new Vector2(r.X + GTextX, y + GPad + k * GLine), Ui.TextColor);
-            if (name is not null) ui.NameBox(sb, name, r.X + 14, y + h - GPad - GNameH, GNameW);
+                ui.ShadowText(sb, ui.Text, text[k], new Vector2(TextX, y + (Framed(e) ? TextTop : 0) + k * Ui.LineHeight), ink);
+            y -= Gap;
         }
-        // gold arrows where there is more: older messages above, newer below
-        if (i >= 0) ui.Arrow(sb, r.Center.X, r.Y + 9, 0, -1);
-        if (_scroll > 0) ui.Arrow(sb, r.Center.X, r.Bottom - 9, 0, 1);
+        // small white marks where there is more: older messages above, newer below
+        if (i >= 0) Triangle(sb, 320, 5, up: true);
+        if (_scroll > 0) Triangle(sb, 320, 470, up: false);
+    }
+
+    void Triangle(SpriteBatch sb, int cx, int y, bool up)
+    {
+        for (int row = 0; row < 5; row++)
+        {
+            int half = up ? row : 4 - row;
+            ui.Fill(sb, new Rectangle(cx - half, y + row, 2 * half + 1, 1), Color.White * 0.85f);
+        }
     }
 }

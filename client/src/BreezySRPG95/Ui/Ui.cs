@@ -143,6 +143,9 @@ public sealed class Ui : IDisposable
     /// <summary>SYSTEM.BMP with palette index 0 transparent (arrows, cursors, balloon pieces).</summary>
     public Texture2D? SystemBmp => _tex.Get("SYSTEM.BMP");
 
+    /// <summary>A face graphic, FACE_nnn.BMP (null for none or a missing one).</summary>
+    public Texture2D? Face(int id) => id > 0 ? _tex.Get($"FACE_{id:000}.BMP") : null;
+
     public void Frame(SpriteBatch sb, Rectangle r, Color c, int t = 1)
     {
         Fill(sb, new Rectangle(r.X, r.Y, r.Width, t), c);
