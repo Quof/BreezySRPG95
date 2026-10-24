@@ -107,6 +107,15 @@ dotnet publish client/src/BreezySRPG95 -c Release -r linux-x64 --self-contained 
 
 The program is one file there too (`BreezySRPG95`), but its three native libraries — `libSDL2-2.0.so.0`, `libopenal.so.1` and `libfreetype.so` — stay files beside it: MonoGame and FreeTypeSharp look beside the program first, and unpacked elsewhere they'd be found only after the system's own copies (`/usr/lib`). It needs no ICU (the culture is invariant: nothing sorts, compares or formats by culture), and runs on glibc 2.33 or newer, which FreeType's library needs: Ubuntu 22.04, Debian 12, Fedora 34, Linux Mint 21, SteamOS 3 or newer, x86-64 only (MonoGame carries no ARM Linux libraries). `python client/tools/make_tarball.py <folder> <out.tar.gz> --exec BreezySRPG95` packs a folder into a `.tar.gz` that keeps the program executable, which zip and rar files made on Windows don't. On Linux the text goes through FreeType, with IPAGothic for MS Gothic (see the fonts under Options), MIDI only through the SoundFont (there's no Windows MIDI), settings live in `~/.config/BreezySRPG95/settings.json`, and the game's files are found whatever their case or Unicode form (`Srpg95.Data/FileNames.cs`). The games' own archives have Shift-JIS file names: they must be unpacked with a tool that converts them (`unar -e Shift_JIS`, `7z x -mcp=932`, Debian's `unzip -O cp932`).
 
+### macOS
+
+```bash
+dotnet publish client/src/BreezySRPG95 -c Release -r osx-arm64 --self-contained -p:PublishSingleFile=true -o client/publish-mac-arm64
+dotnet publish client/src/BreezySRPG95 -c Release -r osx-x64 --self-contained -p:PublishSingleFile=true -o client/publish-mac-x64
+```
+
+Laid out as on Linux: the program, with `libSDL2.dylib`, `libopenal.1.dylib` and `libfreetype.dylib` beside it (universal, x86-64 and arm64, their arm64 code signed), packed by `make_tarball.py` as `BreezySRPG95-v<version>-mac-arm64.tar.gz` (Apple Silicon) and `-mac-x64` (Intel); macOS 12 or newer. Not yet tried on a Mac. Built on Windows, the program isn't signed (the SDK signs only on a Mac) and Apple Silicon runs no unsigned code, so the package's README-MAC.txt has the player sign it locally once (`codesign --force --sign - BreezySRPG95`, built into macOS) after clearing the download's quarantine (`xattr -dr com.apple.quarantine .`). Settings live in `~/.config/BreezySRPG95/settings.json`.
+
 The icon is 昴の騎士's face graphic FACE_003, made into `src/BreezySRPG95/Icon.ico` by `client/tools/make_icon.py`.
 
 The project, its folder (`src/BreezySRPG95`) and its namespace are all called BreezySRPG95 (it was EasySRPG95 before, and Erumani while it played only えるまに).
