@@ -66,23 +66,23 @@ public sealed class Ui : IDisposable
     readonly GraphicsDevice _device;
     readonly Texture2D _pixel;
     readonly Textures _tex;
-    public GdiText Text { get; }
+    public ITextFont Text { get; }
     /// <summary>Menu/panel text (choices, camp menu): smaller than message text.</summary>
-    public GdiText SmallText { get; }
+    public ITextFont SmallText { get; }
     /// <summary>16 px bold (FUN_00407888): unit names on the battle scene's info panels and the status window.</summary>
-    public GdiText NameText { get; }
+    public ITextFont NameText { get; }
     /// <summary>The restyled skins' 14-px bold (the status window's class, which the original draws twice a pixel apart).</summary>
-    public GdiText BoldText { get; }
+    public ITextFont BoldText { get; }
 
     public Ui(GraphicsDevice device, Textures tex)
     {
         _device = device;
         _tex = tex;
         ReadSwatches(tex.Bitmap("SYSTEM.BMP"));
-        Text = new GdiText(device);
-        SmallText = new GdiText(device, 12, 400, "BREEZY_SMALLFONT");
-        NameText = new GdiText(device, 16, 700, "BREEZY_FONT");
-        BoldText = new GdiText(device, 14, 700, "BREEZY_BOLDFONT");
+        Text = TextFonts.Create(device);
+        SmallText = TextFonts.Create(device, 12, 400, "BREEZY_SMALLFONT");
+        NameText = TextFonts.Create(device, 16, 700, "BREEZY_FONT");
+        BoldText = TextFonts.Create(device, 14, 700, "BREEZY_BOLDFONT");
         _pixel = new Texture2D(device, 1, 1);
         _pixel.SetData(new[] { Color.White });
     }
@@ -336,7 +336,7 @@ public sealed class Ui : IDisposable
     }
 
     /// <summary>Text with a soft shadow a pixel down and right, to read on the translucent gilded boxes.</summary>
-    public void ShadowText(SpriteBatch sb, GdiText font, string s, Vector2 pos, Color c)
+    public void ShadowText(SpriteBatch sb, ITextFont font, string s, Vector2 pos, Color c)
     {
         if (font.Get(s) is not { } t) return;
         t.Draw(sb, pos + new Vector2(1, 1), Color.Black * 0.7f);

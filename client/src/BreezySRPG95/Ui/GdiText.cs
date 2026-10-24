@@ -6,38 +6,13 @@ using Microsoft.Xna.Framework.Graphics;
 namespace BreezySRPG95.Ui;
 
 /// <summary>
-/// A string rendered to a texture, <see cref="Scale"/> texture pixels to a pixel of the 640 × 480 screen: 1 for the
-/// original's bitmap text (scaled with the rest of the picture), the render scale for the restyled skins' smooth text, so
-/// that it lands on the window's own pixels and stays crisp however large the window is. A smooth face is drawn
-/// <see cref="Lift"/> px higher and laid out by <see cref="RefHeight"/>, so that every face sits where Yu Gothic UI —
-/// the face the restyled skins were laid out with — would.
-/// </summary>
-public readonly record struct TextImage(Texture2D Texture, int Scale, float Lift = 0, float RefHeight = 0)
-{
-    /// <summary>Its size in 640 × 480 pixels.</summary>
-    public int Width => (Texture.Width + Scale - 1) / Scale;
-    public int Height => (Texture.Height + Scale - 1) / Scale;
-    /// <summary>The height to centre it by: the reference face's line for smooth text, its own for the bitmap fonts.</summary>
-    public float LayoutHeight => RefHeight > 0 ? RefHeight : Texture.Height / (float)Scale;
-
-    /// <summary>Draws it with its corner at <paramref name="pos"/> (640 × 480 pixels, under the frame's scale transform).</summary>
-    public void Draw(SpriteBatch sb, Vector2 pos, Color c)
-    {
-        if (Scale == 1 && Lift == 0) { sb.Draw(Texture, pos, c); return; }
-        // on whole render pixels, so each texel lands on exactly one
-        var p = new Vector2(MathF.Round(pos.X * Scale) / Scale, MathF.Round((pos.Y - Lift) * Scale) / Scale);
-        sb.Draw(Texture, p, null, c, 0, Vector2.Zero, 1f / Scale, SpriteEffects.None, 0);
-    }
-}
-
-/// <summary>
 /// Text rendered exactly like the original runtime: Windows GDI, MS Gothic 18 px bold
 /// (lfHeight -18, FW_BOLD), no anti-aliasing. Verified pixel-identical against a screenshot. Each distinct
 /// string becomes a white-on-transparent texture, tinted at draw time. The restyled skins use a smooth face instead
 /// (the Font setting, <see cref="Ui.Font"/>), rendered at the frame's render scale (<see cref="Ui.RenderScale"/>); layout
-/// still measures at 640 × 480.
+/// still measures at 640 × 480. The Windows renderer (<see cref="TextFonts"/>); <see cref="FreeTypeText"/> is the other.
 /// </summary>
-public sealed class GdiText : IDisposable
+public sealed class GdiText : ITextFont
 {
     readonly GraphicsDevice _device;
     readonly IntPtr _dc, _font;

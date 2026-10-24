@@ -4,9 +4,16 @@
     <ProjectReference Include="..\Srpg95.Data\Srpg95.Data.csproj" />
   </ItemGroup>
 
+  <!-- the tests reach the FreeType renderer's font handling (Ui/FreeTypeText.cs: FreeTypeFonts) -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="Srpg95.Data.Tests" />
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="MeltySynth" Version="2.4.1" />
     <PackageReference Include="MonoGame.Framework.DesktopGL" Version="3.8.2.1105" />
+    <!-- FreeType 2.13 for the text off Windows (Ui/FreeTypeText.cs); its native library for Windows, Linux x64 and macOS -->
+    <PackageReference Include="FreeTypeSharp" Version="3.1.0" />
   </ItemGroup>
 
   <PropertyGroup>
@@ -25,6 +32,8 @@
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <!-- FreeType's API is pointers (Ui/FreeTypeText.cs) -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <!--
@@ -60,6 +69,9 @@
     when they aren't there (the Font option then falls back to Yu Gothic UI). The pixel fonts — DotGothic16Pixel.ttf (made by tools/make_pixel_font.py), PixelMplus12
     (M+ FONT LICENSE, fonts/MPLUS-LICENSE.txt) and the KH Dot font's KH-Dot-Kodenmachou-12/16 — aren't Windows' and
     aren't in git either: put their .ttf files in fonts\ (client/README.md says where to get them) and they're embedded too.
+    IPAGothic (fonts\ipag.ttf, IPA Font License v1.0, fonts\IPA_Font_License_Agreement_v1.0.txt) is the text renderer's
+    stand-in for MS Gothic off Windows (Ui/FreeTypeText.cs): embedded as freetype/ipag.ttf, where GDI isn't given it, and
+    left out of a Windows build (-r win-*), which draws with GDI and MS Gothic.
   -->
   <PropertyGroup>
     <FontsDir>$(MSBuildThisFileDirectory)fonts\</FontsDir>
@@ -68,8 +80,10 @@
     <Copy SourceFiles="$(WINDIR)\Fonts\%(FontFile.Identity)" DestinationFolder="$(FontsDir)"
           Condition="!Exists('$(FontsDir)%(FontFile.Identity)') And Exists('$(WINDIR)\Fonts\%(FontFile.Identity)')" />
     <ItemGroup>
-      <_EmbeddedFont Include="$(FontsDir)*.ttf" />
+      <_EmbeddedFont Include="$(FontsDir)*.ttf" Exclude="$(FontsDir)ipag.ttf" />
       <EmbeddedResource Include="@(_EmbeddedFont)" LogicalName="fonts/%(_EmbeddedFont.Filename)%(_EmbeddedFont.Extension)" />
+      <EmbeddedResource Include="$(FontsDir)ipag.ttf" LogicalName="freetype/ipag.ttf"
+                        Condition="Exists('$(FontsDir)ipag.ttf') And !$(RuntimeIdentifier.StartsWith('win'))" />
     </ItemGroup>
   </Target>
   <ItemGroup>
