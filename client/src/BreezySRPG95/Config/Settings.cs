@@ -82,7 +82,7 @@ public sealed class Settings
     public string NameTags { get; set; } = DefaultNameTags;   // what a message's first line must look like to be its speaker's name (Ui.NameTags); "" none
     public bool BacklogHidesNames { get; set; } = true;   // the backlog leaves out the speaker's name line
     public WeaknessOrbs WeaknessOrbs { get; set; }       // the class's attribute weaknesses as orbs on the status window's portrait
-    public MapHp MapHp { get; set; }                     // each unit's HP under it on the map (MapSession.HpShown)
+    public MapHp MapHp { get; set; } = MapHp.Off;        // each unit's HP under it on the map (MapSession.HpShown)
     public int UnitSpeed { get; set; } = 2;               // units walk on the battle map at this many times the original's pace
     public bool AutoEndTurn { get; set; }                 // the turn ends by itself once every unit of the player's has acted
     public bool SkipEnemyTurn { get; set; }               // resolve the enemy phase instantly (no walking, scenes or popups)
@@ -165,7 +165,7 @@ public sealed class Settings
                 CombatBgm = !string.Equals(Environment.GetEnvironmentVariable("BREEZY_COMBATBGM"), "off", StringComparison.OrdinalIgnoreCase),
                 AutoEndTurn = string.Equals(Environment.GetEnvironmentVariable("BREEZY_AUTOENDTURN"), "on", StringComparison.OrdinalIgnoreCase),
                 WeaknessOrbs = Enum.TryParse<WeaknessOrbs>(Environment.GetEnvironmentVariable("BREEZY_WEAKNESS"), true, out var orbs) ? orbs : WeaknessOrbs.Off,
-                MapHp = Enum.TryParse<MapHp>(Environment.GetEnvironmentVariable("BREEZY_MAPHP"), true, out var hp) ? hp : MapHp.Number,
+                MapHp = Enum.TryParse<MapHp>(Environment.GetEnvironmentVariable("BREEZY_MAPHP"), true, out var hp) ? hp : MapHp.Off,
                 BattleSceneMode = Enum.TryParse<BattleSceneMode>(Environment.GetEnvironmentVariable("BREEZY_BATTLESCENES"), true, out var scenes) ? scenes : BattleSceneMode.On,
                 FastForwardSkipsScenes = string.Equals(Environment.GetEnvironmentVariable("BREEZY_FFSKIPSCENES"), "on", StringComparison.OrdinalIgnoreCase),
                 UnitSpeed = int.TryParse(Environment.GetEnvironmentVariable("BREEZY_UNITSPEED"), out var walk) ? walk : 2,
