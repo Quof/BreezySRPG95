@@ -38,3 +38,6 @@ re/exe/
 client/src/BreezySRPG95/openal/
 /Releases/
 /client/publish-mac-*/
+
+# private notes, kept out of the repository (FORMAT_NOTES.md)
+/notes/
