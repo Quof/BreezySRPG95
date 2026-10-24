@@ -1040,6 +1040,10 @@ namespace NLayer.Decoder
         // call, matching the zero-initialised fresh arrays they replaced.
         readonly int[] _lsfSlen = new int[4];
         readonly int[] _lsfScalefacBuf = new int[54];
+        // BreezySRPG95: the largest value each scalefactor of _lsfScalefacBuf can have (-1 for one not sent), and so, for
+        //  the right channel's (window, band), the illegal intensity position in MPEG-2: see IntensityStereo
+        readonly int[] _lsfIllegalBuf = new int[54];
+        readonly int[][] _isIllegal = { new int[13], new int[13], new int[13], new int[23] };
 
         static readonly int[][][] _sfbBlockCntTab = {
                                                         new int[][] { new int[] { 6, 5, 5, 5 },   new int[] { 9, 9, 9, 9 },    new int[] { 6, 9, 9, 9 }   },
@@ -1294,11 +1298,15 @@ namespace NLayer.Decoder
                     for (int j = 0; j < blkCnt[i]; j++, k++)
                     {
                         buffer[k] = _bitRes.GetBits(slen[i]);
+                        _lsfIllegalBuf[k] = (1 << slen[i]) - 1;
                     }
                 }
                 else
                 {
-                    k += blkCnt[i];
+                    for (int j = 0; j < blkCnt[i]; j++, k++)
+                    {
+                        _lsfIllegalBuf[k] = -1;
+                    }
                 }
             }
 
@@ -1311,6 +1319,7 @@ namespace NLayer.Decoder
                 {
                     for (; sfb < 8; sfb++)
                     {
+                        if (ch == 1) _isIllegal[3][sfb] = _lsfIllegalBuf[k];
                         _scalefac[ch][3][sfb] = buffer[k++];
                     }
                     sfb = 3;
@@ -1320,6 +1329,7 @@ namespace NLayer.Decoder
                 {
                     for (int window = 0; window < 3; window++)
                     {
+                        if (ch == 1) _isIllegal[window][sfb] = _lsfIllegalBuf[k];
                         _scalefac[ch][window][sfb] = buffer[k++];
                     }
                 }
@@ -1331,6 +1341,7 @@ namespace NLayer.Decoder
             {
                 for (; sfb < 21; sfb++)
                 {
+                    if (ch == 1) _isIllegal[3][sfb] = _lsfIllegalBuf[k];
                     _scalefac[ch][3][sfb] = buffer[k++];
                 }
                 _scalefac[ch][3][22] = 0;
@@ -1504,250 +1515,8 @@ namespace NLayer.Decoder
 
                 if ((chanModeExt & 0x1) == 1)
                 {
-                    // do the intensity stereo processing
-
-                    #region Common Processing
-
-                    // find the highest sample index with a value in channel 1
-                    //   - now each step only has to start from there
-                    int lastValueIdx = -1;
-                    for (int i = SBLIMIT * SSLIMIT - (SBLIMIT + 1); i >= 0; i--)
-                    {
-                        if (_samples[1][i] != 0f)
-                        {
-                            lastValueIdx = i;
-                            break;
-                        }
-                    }
-
-                    // figure up which passes we'll need and for which ranges
-                    int lEnd = -1, sStart = -1;
-                    if (_blockSplitFlag[gr][0] && _blockType[gr][0] == 2)
-                    {
-                        if (_mixedBlockFlag[gr][0])
-                        {
-                            // 0 through 8 of long, then 3 through 12 of short
-                            if (lastValueIdx < _sfBandIndexL[8])
-                            {
-                                lEnd = 8;
-                            }
-                            sStart = 3;
-                        }
-                        else
-                        {
-                            // 0 through 12 of short
-                            sStart = 0;
-                        }
-                    }
-                    else
-                    {
-                        // 0 through 21 of long
-                        lEnd = 21;
-                    }
-
-                    #endregion
-
-                    #region Long Processing
-
-                    // long processing is far simpler than short...  just process from the start of the scalefactor band after the last non-zero sample
-                    // we also don't have to mess with "finding" again; it was done above
-                    var sfb = 0;
-                    if (lastValueIdx > -1)
-                    {
-                        sfb = _cbLookupL[lastValueIdx] + 1;
-                    }
-
-                    // make sure we do the mid/side processing on the lower bands (if needed)
-                    if (sfb > 0 && sStart == -1)
-                    {
-                        if (midSide)
-                        {
-                            ApplyMidSide(0, _sfBandIndexL[sfb]);
-                        }
-                        else
-                        {
-                            ApplyFullStereo(0, _sfBandIndexL[sfb]);
-                        }
-                    }
-
-                    // now process the intensity bands
-                    for (; sfb < lEnd; sfb++)
-                    {
-                        var i = _sfBandIndexL[sfb];
-                        var width = _sfBandIndexL[sfb + 1] - _sfBandIndexL[sfb];
-                        var isPos = _scalefac[1][3][sfb];
-                        if (isPos >= 7)
-                        {
-                            if (midSide)
-                            {
-                                ApplyMidSide(i, width);
-                            }
-                            else
-                            {
-                                ApplyFullStereo(i, width);
-                            }
-                        }
-                        else if (lsf)
-                        {
-                            ApplyLsfIStereo(i, width, isPos, _scalefacCompress[gr][0]);
-                        }
-                        else
-                        {
-                            ApplyIStereo(i, width, isPos);
-                        }
-                    }
-
-                    if (sStart <= -1)
-                    {
-                        // do final long processing
-                        var isPos = _scalefac[1][3][20];
-                        if (isPos >= 7)
-                        {
-                            if (midSide)
-                            {
-                                ApplyMidSide(_sfBandIndexL[21], 576 - _sfBandIndexL[21]);
-                            }
-                            else
-                            {
-                                ApplyFullStereo(_sfBandIndexL[21], 576 - _sfBandIndexL[21]);
-                            }
-                        }
-                        else if (lsf)
-                        {
-                            ApplyLsfIStereo(_sfBandIndexL[21], 576 - _sfBandIndexL[21], isPos, _scalefacCompress[gr][0]);
-                        }
-                        else
-                        {
-                            ApplyIStereo(_sfBandIndexL[21], 576 - _sfBandIndexL[21], isPos);
-                        }
-                    }
-
-                    #endregion
-
-                    #region Short Processing
-
-                    // short processing requires that each window be looked at separately... they are interleaved, so it gets really interesting...
-                    // on the plus side, whichever window the {lastValueIdx} is in is already found... :)
-                    else
-                    {
-                        // find where each window starts intensity processing
-                        var sSfb = new int[] { -1, -1, -1 };
-                        int window;
-                        if (lastValueIdx > -1)
-                        {
-                            sfb = _cbLookupS[lastValueIdx];
-                            window = _cbwLookupS[lastValueIdx];
-                            sSfb[window] = sfb;
-                        }
-                        else
-                        {
-                            sfb = 12;
-                            window = 3; // NB: 3 is correct!
-                        }
-
-                        window = (window - 1) % 3;
-                        for (; sfb >= sStart && window >= 0; window = (window - 1) % 3)
-                        {
-                            if (sSfb[window] != -1)
-                            {
-                                if (sSfb[0] != -1 && sSfb[1] != -1 && sSfb[2] != -1)
-                                {
-                                    break;
-                                }
-                                continue;
-                            }
-
-                            var width = _sfBandIndexS[sfb + 1] - _sfBandIndexS[sfb];
-                            var i = _sfBandIndexS[sfb] * 3 + width * (window + 1);
-
-                            while (--width >= -1)
-                            {
-                                if (_samples[1][--i] != 0f)
-                                {
-                                    sSfb[window] = sfb;
-                                    break;
-                                }
-                            }
-
-                            if (window == 0)
-                            {
-                                --sfb;
-                            }
-                        }
-
-                        // now apply the intensity processing for each window & scalefactor band
-                        sfb = sStart;
-                        for (; sfb < 12; sfb++)
-                        {
-                            var width = _sfBandIndexS[sfb + 1] - _sfBandIndexS[sfb];
-                            var i = _sfBandIndexS[sfb] * 3;
-
-                            for (window = 0; window < 3; window++)
-                            {
-                                if (sfb > sSfb[window])
-                                {
-                                    var isPos = _scalefac[1][window][sfb];
-                                    if (isPos >= 7)
-                                    {
-                                        if (midSide)
-                                        {
-                                            ApplyMidSide(i, width);
-                                        }
-                                        else
-                                        {
-                                            ApplyFullStereo(i, width);
-                                        }
-                                    }
-                                    else if (lsf)
-                                    {
-                                        ApplyLsfIStereo(i, width, isPos, _scalefacCompress[gr][0]);
-                                    }
-                                    else
-                                    {
-                                        ApplyIStereo(i, width, isPos);
-                                    }
-                                }
-                                else if (midSide)
-                                {
-                                    ApplyMidSide(i, width);
-                                }
-                                else
-                                {
-                                    ApplyFullStereo(i, width);
-                                }
-
-                                i += width;
-                            }
-                        }
-
-                        // do final short processing
-                        var finalWidth = _sfBandIndexS[13] - _sfBandIndexS[12];
-                        for (window = 0; window < 3; window++)
-                        {
-                            var isPos = _scalefac[1][window][11];
-                            if (isPos >= 7)
-                            {
-                                if (midSide)
-                                {
-                                    ApplyMidSide(_sfBandIndexS[11] * 3 + finalWidth * window, finalWidth);
-                                }
-                                else
-                                {
-                                    ApplyFullStereo(_sfBandIndexS[11] * 3 + finalWidth * window, finalWidth);
-                                }
-                            }
-                            else if (lsf)
-                            {
-                                ApplyLsfIStereo(_sfBandIndexS[11] * 3 + finalWidth * window, finalWidth, isPos, _scalefacCompress[gr][0]);
-                            }
-                            else
-                            {
-                                ApplyIStereo(_sfBandIndexS[11] * 3 + finalWidth * window, finalWidth, isPos);
-                            }
-                        }
-                    }
-
-                    #endregion
+                    // BreezySRPG95: the intensity stereo processing, rewritten
+                    IntensityStereo(gr, lsf, midSide);
                 }
                 else if (midSide)
                 {
@@ -1764,6 +1533,97 @@ namespace NLayer.Decoder
             {
                 // this is a no-op most of the time
                 ApplyFullStereo(0, SSLIMIT * SBLIMIT);
+            }
+        }
+
+        // BreezySRPG95: intensity stereo, rewritten. The bands are scanned from the top down, each short block's window on
+        //  its own, and while the right channel is still all zero there (the whole band is checked), a band whose intensity
+        //  position (the right channel's scalefactor; the top band, which has none, takes the one below's) is legal is an
+        //  intensity stereo band; the rest are mid/side bands (or left/right). In MPEG-2 (ISO/IEC 13818-3) a band's illegal
+        //  position is the largest value its scalefactor's length allows, 2^slen - 1, and the scale is the right channel's
+        //  scalefac_compress % 2. NLayer 3.0.0 looked for the right channel's last value below sample 543 only, treated every
+        //  position from 7 up as illegal in MPEG-2 too, and took the scale from the left channel. Checked against Windows'
+        //  own MP3 decoder: a 22.05 kHz MPEG-2 joint-stereo file decodes the same to 81 dB (it was 29-33 dB).
+        readonly bool[] _isZero = new bool[3];
+
+        void IntensityStereo(int gr, bool lsf, bool midSide)
+        {
+            var right = _samples[1];
+
+            // the long bands below longEnd, the short ones from shortStart up
+            int longEnd, shortStart;
+            if (!(_blockSplitFlag[gr][0] && _blockType[gr][0] == 2))
+            {
+                longEnd = 22;
+                shortStart = 13;
+            }
+            else if (_mixedBlockFlag[gr][0])
+            {
+                // the first 36 samples are long bands: 8 in MPEG 1, 6 in MPEG 2
+                longEnd = _sfBandIndexL[8] == 36 ? 8 : 6;
+                shortStart = 3;
+            }
+            else
+            {
+                longEnd = 0;
+                shortStart = 0;
+            }
+            var scale = _scalefacCompress[gr][1];
+
+            // short bands: a band's three windows are one after the other
+            _isZero[0] = _isZero[1] = _isZero[2] = true;
+            var top = SBLIMIT * SSLIMIT;
+            for (var sfb = 12; sfb >= shortStart; sfb--)
+            {
+                var width = _sfBandIndexS[sfb + 1] - _sfBandIndexS[sfb];
+                for (var window = 2; window >= 0; window--)
+                {
+                    top -= width;
+                    if (_isZero[window]) _isZero[window] = AllZero(right, top, width);
+                    IntensityBand(top, width, _isZero[window], window, Math.Min(sfb, 11), lsf, midSide, scale);
+                }
+            }
+
+            var zero = _isZero[0] && _isZero[1] && _isZero[2];
+            for (var sfb = longEnd - 1; sfb >= 0; sfb--)
+            {
+                var start = _sfBandIndexL[sfb];
+                var width = _sfBandIndexL[sfb + 1] - start;
+                if (zero) zero = AllZero(right, start, width);
+                IntensityBand(start, width, zero, 3, Math.Min(sfb, 20), lsf, midSide, scale);
+            }
+        }
+
+        static bool AllZero(float[] buf, int i, int count)
+        {
+            for (; count > 0; count--, i++)
+            {
+                if (buf[i] != 0f) return false;
+            }
+            return true;
+        }
+
+        void IntensityBand(int i, int width, bool zero, int window, int sfb, bool lsf, bool midSide, int scale)
+        {
+            var isPos = _scalefac[1][window][sfb];
+            if (zero && (lsf ? isPos != _isIllegal[window][sfb] : isPos < 7))
+            {
+                if (lsf)
+                {
+                    ApplyLsfIStereo(i, width, isPos, scale);
+                }
+                else
+                {
+                    ApplyIStereo(i, width, isPos);
+                }
+            }
+            else if (midSide)
+            {
+                ApplyMidSide(i, width);
+            }
+            else
+            {
+                ApplyFullStereo(i, width);
             }
         }
 

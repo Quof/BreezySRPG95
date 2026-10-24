@@ -10,6 +10,11 @@ namespace NLayer.Decoder
         byte[] _buf = new byte[8192];
         int _start = 0, _end = -1, _bitsLeft = 0;
         long _bitsRead = 0L;
+        // BreezySRPG95: whether nothing has been added since the start or a reset. NLayer 3.0.0 took _end == -1 to mean
+        //  that, but _end also wraps to -1 when a frame's main data ends at the buffer's last byte, and the next frame was
+        //  then dropped as if the data it continues were missing: wherever the main data so far adds up to a multiple of
+        //  8192 bytes (in a 128 kbps joint-stereo file whose frames are all padded, at frame 815).
+        bool _empty = true;
 
         static int GetSlots(IMpegFrame frame)
         {
@@ -25,6 +30,8 @@ namespace NLayer.Decoder
         public bool AddBits(IMpegFrame frame, int overlap)
         {
             var originalEnd = _end;
+            var wasEmpty = _empty;
+            _empty = false;
 
             var slots = GetSlots(frame);
             while (--slots >= 0)
@@ -36,7 +43,7 @@ namespace NLayer.Decoder
             }
 
             _bitsLeft = 8;
-            if (originalEnd == -1)
+            if (wasEmpty)
             {
                 // it's either the start of the stream or we've reset...  only return true if overlap says this frame is enough
                 return overlap == 0;
@@ -204,6 +211,7 @@ namespace NLayer.Decoder
             _start = 0;
             _end = -1;
             _bitsLeft = 0;
+            _empty = true;
         }
     }
 }

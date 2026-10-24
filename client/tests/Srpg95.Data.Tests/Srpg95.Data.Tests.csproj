@@ -24,6 +24,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Srpg95.Data\Srpg95.Data.csproj" />
     <ProjectReference Include="..\..\src\BreezySRPG95\BreezySRPG95.csproj" />
+    <ProjectReference Include="..\..\src\NLayer\NLayer.csproj" />
   </ItemGroup>
 
 </Project>
