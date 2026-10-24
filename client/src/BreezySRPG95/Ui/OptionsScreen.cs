@@ -271,7 +271,7 @@ public sealed class OptionsScreen
             T("Names are identified and shown in the nametag box used in", "名前は次の検索パターンで判定され、オリジナル以外の"),
             T("the alternative guis by the following search patterns.", "インターフェースの名前欄に表示されます。"),
             T("* = Name", "* ＝ 名前"), T("Space = different patterns.", "スペース ＝ 別のパターン"),
-            T("So *: identifies \"Rutee:\" as a name and puts it in the", "例：*： は「ルーティ：」を名前と判定し、"),
+            T("So *: identifies \"Rutee:\" as a name and puts it in the", "例　　*： は「ルーティ：」を名前と判定し、"),
             T("nametag box.", "名前欄に表示します。"),
             T("To add more, type them then press enter. ESC to cancel.", "追加するには入力して Enter、Esc で取消。"), "-",
         };
