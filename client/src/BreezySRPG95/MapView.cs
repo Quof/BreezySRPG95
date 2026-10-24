@@ -644,29 +644,27 @@ public sealed class MapSession : IMapContext
     static readonly Color HpFull = new(56, 176, 255), HpHurt = new(72, 216, 88), HpLow = new(240, 64, 56);
 
     /// <summary>
-    /// The HP along the bottom of the 32 × 32 tile, nothing behind it, so the unit stays in sight: a 2-px gauge, and with
-    /// the number, a 3-px gauge with the HP in 3 × 5 dots at its right, a 1-px shadow under the dots to read on any ground.
+    /// The HP along the bottom of the 32 × 32 tile, nothing behind it, so the unit stays in sight: a 2-px gauge, the same
+    /// with the number or without; with it, the HP in 3 × 5 dots over the gauge's right end (a full gauge runs under
+    /// them), a 1-px shadow under the dots to read on any ground.
     /// </summary>
     static void DrawHp(SpriteBatch sb, BattleUnit u, Vector2 pos, Rectangle viewport)
     {
         int max = Math.Max(1, u.MaxHp), hp = Math.Clamp(u.Hp, 0, max);
         var c = hp >= max ? HpFull : hp * 4 <= max ? HpLow : HpHurt;
         int x = (int)MathF.Floor(pos.X), bottom = (int)MathF.Floor(pos.Y) + Tile - 1;
-        if (HpShown == Config.MapHp.Gauge)
-        {
-            Fill(sb, new Rectangle(x + 4, bottom - 2, Math.Max(1, 24 * hp / max), 2), c, viewport);
-            return;
-        }
+        const int GaugeX = 4, GaugeW = 24;
+        Fill(sb, new Rectangle(x + GaugeX, bottom - 2, Math.Max(1, GaugeW * hp / max), 2), c, viewport);
+        if (HpShown != Config.MapHp.Number) return;
         string n = hp.ToString();
-        int numX = x + 31 - 1 - (n.Length * 4 - 1), gx = x + 2, gw = x + 30 - 11 - 2 - gx;   // room for three digits, so every gauge is as long
-        Fill(sb, new Rectangle(gx, bottom - 4, Math.Max(1, gw * hp / max), 3), c, viewport);
+        int numX = x + GaugeX + GaugeW - (n.Length * 4 - 1);   // its right edge at the gauge's
         foreach (var (dx, dy, ink) in new[] { (1, 1, Color.Black * 0.8f), (0, 0, Color.White) })
             for (int k = 0; k < n.Length; k++)
             {
                 var rows = Digits[n[k] - '0'];
                 for (int r = 0; r < 5; r++)
                     for (int b = 0; b < 3; b++)
-                        if ((rows[r] >> (2 - b) & 1) != 0) Fill(sb, new Rectangle(numX + k * 4 + b + dx, bottom - 6 + r + dy, 1, 1), ink, viewport);
+                        if ((rows[r] >> (2 - b) & 1) != 0) Fill(sb, new Rectangle(numX + k * 4 + b + dx, bottom - 5 + r + dy, 1, 1), ink, viewport);
             }
     }
 
