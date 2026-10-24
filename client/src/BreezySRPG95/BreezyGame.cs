@@ -10,7 +10,7 @@ namespace BreezySRPG95;
 /// <summary>
 /// The client. Loads the original data, draws in the original's 640x480 coordinates at the window's resolution
 /// (see <see cref="_scale"/>). Each map's OPENING event runs when the map loads.
-/// Controls: see client/README.md (rebindable under Options, F1).
+/// Controls: see README.md (rebindable under Options, F1).
 /// </summary>
 public sealed class BreezyGame : Game
 {

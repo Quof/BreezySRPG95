@@ -114,7 +114,7 @@
     aren't kept in git: the build copies them from Windows' own fonts folder (Windows 11 ships them) and leaves them out
     when they aren't there (the Font option then falls back to Yu Gothic UI). The pixel fonts — DotGothic16Pixel.ttf (made by tools/make_pixel_font.py), PixelMplus12
     (M+ FONT LICENSE, fonts/MPLUS-LICENSE.txt) and the KH Dot font's KH-Dot-Kodenmachou-12/16 — aren't Windows' and
-    aren't in git either: put their .ttf files in fonts\ (client/README.md says where to get them) and they're embedded too.
+    aren't in git either: put their .ttf files in fonts\ (client/BUILDING.md says where to get them) and they're embedded too.
     IPAGothic (fonts\ipag.ttf, IPA Font License v1.0, fonts\IPA_Font_License_Agreement_v1.0.txt) is the text renderer's
     stand-in for MS Gothic off Windows (Ui/FreeTypeText.cs): embedded as freetype/ipag.ttf, where GDI isn't given it, and
     left out of a Windows build (-r win-*), which draws with GDI and MS Gothic.
@@ -148,7 +148,7 @@
   </ItemGroup>
 
   <!-- Publishing on Windows (-r win-x64): one BreezySRPG95.exe and nothing else — the runtime, SDL2, OpenAL and FreeType go
-       inside it (the native ones are unpacked to a cache folder on first start, see client/README.md).
+       inside it (the native ones are unpacked to a cache folder on first start, see client/BUILDING.md).
        On Linux and macOS (-r linux-x64, osx-x64, osx-arm64): the program in one file with its native libraries (SDL2, OpenAL,
        FreeType) as files beside it, where MonoGame and FreeTypeSharp look first: unpacked elsewhere, they'd be found after
        the system's own copies (/usr/lib), if any. -->

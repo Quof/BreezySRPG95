@@ -5,7 +5,7 @@ namespace Srpg95.Data.Tests;
 /// <summary>
 /// The FreeType text renderer (Linux, macOS; BREEZY_TEXT=freetype on Windows) against what Windows GDI gives with the
 /// same font files: line metrics and string widths measured with GDI, and the variable fonts' weights. The fonts are in
-/// the executable only where the build found them (client/README.md): without them these tests have nothing to check.
+/// the executable only where the build found them (client/BUILDING.md): without them these tests have nothing to check.
 /// </summary>
 public class FreeTypeTextTests
 {
