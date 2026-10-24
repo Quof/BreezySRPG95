@@ -111,6 +111,7 @@ public sealed class OptionsScreen
         };
         if (page == Page.Main)
         {
+            if (_toTitle is not null || _quit is not null) _rows.Add(Gap());   // the game's own commands apart from the categories
             if (_toTitle is { } title)
                 _rows.Add(new(T("Return to Title", "タイトルへ戻る"), () => "",
                     Activate: () => Ask(T("Return to the title screen?", "タイトルへ戻りますか？"), title)));
