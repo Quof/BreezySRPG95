@@ -14,6 +14,7 @@
 # release notes written for GitHub's release page
 /release-notes-*.md
 /*.rar
+/*.tar.gz
 
 # Generated parser output (rebuild with re/srpg95_data.py)
 /re/json*/
@@ -25,6 +26,7 @@ obj/
 *.user
 .vs/
 /client/publish/
+/client/publish-linux/
 
 recordings/
 client/publish/

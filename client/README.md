@@ -85,13 +85,21 @@ Set `SRPG95_REQUIRE_DATA=1` to make the tests fail instead of silently passing w
 
 ## Playing
 
-Put `BreezySRPG95.exe` (one file, from a published build) in the game folder, next to `SRPGEXEC.EXE`, and run it; or run it from anywhere with `--game "<game folder>"`. No .NET install is needed: the runtime, SDL2 and OpenAL are inside the exe (the two native libraries are unpacked to `%TEMP%\.net\BreezySRPG95` on the first start). Nothing is written next to the exe: settings live in `%APPDATA%\BreezySRPG95\settings.json`, shared by every game, and saves go where the original keeps them (the game folder). A `settings.json` placed beside the exe is used instead, for a setup that keeps its own.
+Put `BreezySRPG95.exe` (one file, from a published build) in the game folder, next to `SRPGEXEC.EXE`, and run it; or run it from anywhere with `--game "<game folder>"`. No .NET install is needed: the runtime, SDL2, OpenAL and FreeType are inside the exe (the three native libraries are unpacked to `%TEMP%\.net\BreezySRPG95` on the first start; FreeType only draws text with `BREEZY_TEXT=freetype`). Nothing is written next to the exe: settings live in `%APPDATA%\BreezySRPG95\settings.json`, shared by every game, and saves go where the original keeps them (the game folder). A `settings.json` placed beside the exe is used instead, for a setup that keeps its own.
 
 Music plays through **GeneralUser GS** (v2.0.3, by S. Christian Collins, [schristiancollins.com](http://www.schristiancollins.com)), a GS SoundFont embedded in the exe, so everyone hears the same soundtrack; its licence ([`src/BreezySRPG95/soundfont/GeneralUser-GS-LICENSE.txt`](src/BreezySRPG95/soundfont/GeneralUser-GS-LICENSE.txt)) allows bundling it. Under Options you can switch to another `.sf2` put in a `soundfonts` folder next to the exe or in the game folder, or to Windows MIDI as in the original. A MIDI track plays without the silence before its first note and after its last one, so no repeat waits: ＯtoＺ's `legend.mid` ended in 26 s of silence. The first build downloads the SoundFont from the author's repository (hash-checked); it isn't kept in git.
 
 ```bash
 dotnet publish client/src/BreezySRPG95 -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -o client/publish
 ```
+
+### Linux
+
+```bash
+dotnet publish client/src/BreezySRPG95 -c Release -r linux-x64 --self-contained -p:PublishSingleFile=true -o client/publish-linux
+```
+
+The program is one file there too (`BreezySRPG95`), but its three native libraries — `libSDL2-2.0.so.0`, `libopenal.so.1` and `libfreetype.so` — stay files beside it: MonoGame and FreeTypeSharp look beside the program first, and unpacked elsewhere they'd be found only after the system's own copies (`/usr/lib`). It needs no ICU (the culture is invariant: nothing sorts, compares or formats by culture), and runs on glibc 2.33 or newer, which FreeType's library needs: Ubuntu 22.04, Debian 12, Fedora 34, Linux Mint 21, SteamOS 3 or newer, x86-64 only (MonoGame carries no ARM Linux libraries). `python client/tools/make_tarball.py <folder> <out.tar.gz> --exec BreezySRPG95` packs a folder into a `.tar.gz` that keeps the program executable, which zip and rar files made on Windows don't. On Linux the text goes through FreeType, with IPAGothic for MS Gothic (see the fonts under Options), MIDI only through the SoundFont (there's no Windows MIDI), settings live in `~/.config/BreezySRPG95/settings.json`, and the game's files are found whatever their case or Unicode form (`Srpg95.Data/FileNames.cs`). The games' own archives have Shift-JIS file names: they must be unpacked with a tool that converts them (`unar -e Shift_JIS`, `7z x -mcp=932`, Debian's `unzip -O cp932`).
 
 The icon is 昴の騎士's face graphic FACE_003, made into `src/BreezySRPG95/Icon.ico` by `client/tools/make_icon.py`.
 

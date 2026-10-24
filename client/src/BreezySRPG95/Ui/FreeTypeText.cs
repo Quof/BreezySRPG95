@@ -202,7 +202,16 @@ static unsafe class FreeTypeFonts
     {
         if (_lib != null) return;
         FT_LibraryRec_* lib;
-        var e = FT_Init_FreeType(&lib);
+        FT_Error e;
+        try { e = FT_Init_FreeType(&lib); }
+        catch (Exception x) when (x is DllNotFoundException or FileLoadException or BadImageFormatException)
+        {
+            // the library beside the program (libfreetype.so) didn't load: on Linux, most likely a C library older than it
+            throw new InvalidOperationException(OperatingSystem.IsLinux()
+                ? "FreeType (libfreetype.so, beside BreezySRPG95) couldn't be loaded. It needs glibc 2.33 or newer: Ubuntu 22.04, "
+                  + "Debian 12, Fedora 34, Linux Mint 21, SteamOS 3 or newer. Keep it in the same folder as BreezySRPG95."
+                : "FreeType couldn't be loaded.", x);
+        }
         if (e != FT_Error.FT_Err_Ok) throw new InvalidOperationException($"FreeType couldn't start: {e}");
         _lib = lib;
     }

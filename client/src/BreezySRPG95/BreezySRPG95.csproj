@@ -101,13 +101,21 @@
     <EmbeddedResource Include="soundfont\GeneralUser-GS.sf2" LogicalName="GeneralUser-GS.sf2" />
   </ItemGroup>
 
-  <!-- Publishing: one BreezySRPG95.exe and nothing else — the runtime, SDL2 and OpenAL go inside it (the native ones are
-       unpacked to a cache folder on first start, see client/README.md) -->
+  <!-- Publishing on Windows (-r win-x64): one BreezySRPG95.exe and nothing else — the runtime, SDL2, OpenAL and FreeType go
+       inside it (the native ones are unpacked to a cache folder on first start, see client/README.md).
+       On Linux and macOS (-r linux-x64, osx-x64, osx-arm64): the program in one file with its native libraries (SDL2, OpenAL,
+       FreeType) as files beside it, where MonoGame and FreeTypeSharp look first: unpacked elsewhere, they'd be found after
+       the system's own copies (/usr/lib), if any. -->
   <PropertyGroup Condition="'$(PublishSingleFile)' == 'true'">
-    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <IncludeNativeLibrariesForSelfExtract Condition="$(RuntimeIdentifier.StartsWith('win'))">true</IncludeNativeLibrariesForSelfExtract>
     <!-- compressed inside the exe (the SoundFont and the fonts are most of it): about 35 MB smaller, no slower to start -->
     <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
     <DebugType>none</DebugType>
+  </PropertyGroup>
+  <!-- Linux and macOS builds need no ICU library (a Linux without one would refuse to start): nothing here sorts, compares or
+       formats by culture — sorting is by numbers, names compare ordinally — so the invariant culture changes nothing -->
+  <PropertyGroup Condition="'$(RuntimeIdentifier)' != '' And !$(RuntimeIdentifier.StartsWith('win'))">
+    <InvariantGlobalization>true</InvariantGlobalization>
   </PropertyGroup>
 
 </Project>
