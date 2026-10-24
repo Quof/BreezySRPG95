@@ -52,10 +52,12 @@ public sealed class Audio(GameFolder game) : IDisposable
 
     /// <summary>
     /// Use this SoundFont for MIDI: a .sf2 path, <see cref="Config.Settings.BuiltIn"/> for the one embedded in the
-    /// executable, or null for Windows MIDI. Restarts the current track with it.
+    /// executable, or null for Windows MIDI. Restarts the current track with it. Off Windows, which has no MCI, null and
+    /// an unreadable file mean the built-in one.
     /// </summary>
     public void SetSoundFont(string? path)
     {
+        if (!HasMci) path ??= Config.Settings.BuiltIn;
         if (string.Equals(path, _soundFont, StringComparison.OrdinalIgnoreCase)) return;
         _soundFont = path;
         StopSynth();
@@ -75,6 +77,7 @@ public sealed class Audio(GameFolder game) : IDisposable
                 _sequencer = new MidiFileSequencer(_synth);
             }
             catch (Exception) { _synth = null; _sequencer = null; _soundFont = null; }   // unreadable SoundFont: Windows MIDI
+            if (_synth is null && !HasMci && path != Config.Settings.BuiltIn) { SetSoundFont(Config.Settings.BuiltIn); return; }
         }
         var current = CurrentBgm;
         CurrentBgm = null;
@@ -108,6 +111,9 @@ public sealed class Audio(GameFolder game) : IDisposable
     }
 
     // ---------------- MCI (Windows) ----------------
+
+    /// <summary>Whether Windows' MCI (winmm.dll) is there to play MIDI and WAV music: on Windows only.</summary>
+    static readonly bool HasMci = OperatingSystem.IsWindows();
 
     [System.Runtime.InteropServices.DllImport("winmm.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
     static extern int mciSendStringW(string command, System.Text.StringBuilder? ret, int retLen, IntPtr callback);
@@ -172,6 +178,7 @@ public sealed class Audio(GameFolder game) : IDisposable
                 return;
             }
         }
+        if (!HasMci) return;   // off Windows: a track the synth or a looping sound can't play is silent
         if (midi && midiBytes is not null) path = TrimmedCopy(midiBytes) ?? path;
         Mci($"open \"{path}\" type {(midi ? "sequencer" : "waveaudio")} alias breezy_bgm");
         Mci($"setaudio breezy_bgm volume to {(int)(_musicVolume * 1000)}");

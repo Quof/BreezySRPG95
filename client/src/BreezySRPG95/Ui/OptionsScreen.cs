@@ -176,7 +176,9 @@ public sealed class OptionsScreen
                 Level: () => _s.MusicVolume, SetLevel: v => _s.MusicVolume = v),
             new(T("SE volume", "SEの音量"), () => "", d => _s.SoundVolume = Math.Clamp(_s.SoundVolume + 10 * d, 0, 100), Wheel: true,
                 Level: () => _s.SoundVolume, SetLevel: v => _s.SoundVolume = v),
-            Choice(T("MIDI playback", "MIDI再生"), () => new[] { T("Windows MIDI (original)", "Windows MIDI（オリジナル）"), T("SoundFont", "サウンドフォント") },
+            // off Windows there is no Windows MIDI: the choice says so, and the SoundFont plays (Audio.SetSoundFont)
+            Choice(T("MIDI playback", "MIDI再生"), () => new[] { OperatingSystem.IsWindows() ? T("Windows MIDI (original)", "Windows MIDI（オリジナル）")
+                    : T("Windows MIDI (Windows only)", "Windows MIDI（Windowsのみ）"), T("SoundFont", "サウンドフォント") },
                 () => (int)_s.Music, i => _s.Music = (MusicEngine)i),
             Choice(T("SoundFont", "サウンドフォント"), () => fonts.Select(FontName).ToArray(),
                 () => Math.Max(0, fonts.IndexOf(_s.ResolveSoundFont(_gameRoot))),

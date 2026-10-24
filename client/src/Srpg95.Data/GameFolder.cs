@@ -5,20 +5,27 @@ namespace Srpg95.Data;
 /// <summary>
 /// A game folder (the one containing SRPGEXEC.EXE and the .DAT files), with an optional
 /// RTP folder as a fallback for graphics, music and sounds the game doesn't ship itself.
-/// File lookup is case-insensitive because the original files mix cases (Swname.dat, ...).
+/// File lookup is case-insensitive because the original files mix cases (Swname.dat, ...). Off Windows it also ignores
+/// the names' Unicode form (<see cref="FileNames.Key"/>): macOS can store a Japanese name decomposed.
 /// </summary>
 public sealed class GameFolder
 {
     public string Root { get; }
     public string? RtpRoot { get; }
     readonly Dictionary<string, Dictionary<string, string>> _dirs = new(StringComparer.OrdinalIgnoreCase);
+    readonly bool _normalize;
 
-    public GameFolder(string root, string? rtpRoot = null)
+    /// <param name="normalizeNames">compare names in Unicode normal form C (default: off Windows, <see cref="FileNames.MatchByHand"/>)</param>
+    public GameFolder(string root, string? rtpRoot = null, bool? normalizeNames = null)
     {
         if (!Directory.Exists(root)) throw new DirectoryNotFoundException(root);
         Root = root;
         RtpRoot = rtpRoot is not null && Directory.Exists(rtpRoot) ? rtpRoot : null;
+        _normalize = normalizeNames ?? FileNames.MatchByHand;
     }
+
+    /// <summary>A file name as the listings compare it.</summary>
+    string Key(string name) => _normalize ? FileNames.Key(name) : name;
 
     Dictionary<string, string> Listing(string dir)
     {
@@ -27,7 +34,7 @@ public sealed class GameFolder
             map = new(StringComparer.OrdinalIgnoreCase);
             if (Directory.Exists(dir))
                 foreach (var f in Directory.EnumerateFileSystemEntries(dir))
-                    map.TryAdd(Path.GetFileName(f), f);
+                    map.TryAdd(Key(Path.GetFileName(f)), f);
             _dirs[dir] = map;
         }
         return map;
@@ -39,7 +46,7 @@ public sealed class GameFolder
         var parts = relative.Split('/', '\\');
         for (int i = 0; i < parts.Length; i++)
         {
-            if (!Listing(dir).TryGetValue(parts[i], out var next)) return null;
+            if (!Listing(dir).TryGetValue(Key(parts[i]), out var next)) return null;
             dir = next;
         }
         return dir;
@@ -81,7 +88,7 @@ public sealed class GameFolder
                 {
                     foreach (var path in Directory.EnumerateFiles(dir))
                     {
-                        string file = Path.GetFileName(path);
+                        string file = Key(Path.GetFileName(path));
                         if (dir == rtp && own.Contains(file)) continue;   // the game's own is the one shown
                         if (dir == game) own.Add(file);
                         try { _readAhead.TryAdd(path, File.ReadAllBytes(path)); } catch (Exception) { }   // read when it's shown instead

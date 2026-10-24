@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Xna.Framework.Input;
+using Srpg95.Data;
 
 namespace BreezySRPG95.Config;
 
@@ -191,11 +192,14 @@ public sealed class Settings
         }
     }
 
-    /// <summary>SoundFonts the player can choose: *.sf2 in soundfonts/ next to the executable and in the game folder.</summary>
+    /// <summary>
+    /// SoundFonts the player can choose: *.sf2 in soundfonts/ next to the executable and in the game folder (the folder's
+    /// name and the files' extension in any case, off Windows too).
+    /// </summary>
     public static List<string> FindSoundFonts(string gameRoot)
     {
-        var dirs = new[] { System.IO.Path.Combine(AppContext.BaseDirectory, "soundfonts"), System.IO.Path.Combine(gameRoot, "soundfonts"), gameRoot };
-        return dirs.Where(Directory.Exists).SelectMany(d => Directory.GetFiles(d, "*.sf2")).Distinct().ToList();
+        var dirs = new[] { FileNames.In(AppContext.BaseDirectory, "soundfonts"), FileNames.In(gameRoot, "soundfonts"), gameRoot };
+        return dirs.Where(Directory.Exists).SelectMany(d => Directory.GetFiles(d, "*.sf2", FileNames.AnyCase)).Distinct().ToList();
     }
 
     /// <summary>Stands for the SoundFont embedded in the executable (GeneralUser GS).</summary>

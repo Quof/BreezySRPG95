@@ -134,7 +134,7 @@ public sealed class BreezyGame : Game
         _gradeFx = LoadGradeShader();
         SetScale(1);
 
-        _mapIndices = Directory.GetFiles(Path.Combine(_folder.Root, "MAP"), "SMAP_*.DAT")
+        _mapIndices = Directory.GetFiles(FileNames.In(_folder.Root, "MAP"), "SMAP_*.DAT", FileNames.AnyCase)
             .Select(p => int.Parse(Path.GetFileNameWithoutExtension(p)[5..]) - 1).Order().ToArray();
         SaveFile.Directory = _opts.SaveDir;
         int start = _opts.StartMap ?? _db.StartMap;

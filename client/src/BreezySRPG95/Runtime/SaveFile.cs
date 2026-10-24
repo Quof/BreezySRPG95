@@ -24,7 +24,8 @@ public sealed class SaveFile
     /// <summary>Where SAVEn.DAT files live: the game folder (as the original), unless --saves points elsewhere.</summary>
     public static string? Directory { get; set; }
 
-    public static string PathFor(GameFolder game, int slot) => Path.Combine(Directory ?? game.Root, $"SAVE{slot}.DAT");
+    /// <summary>A slot's file: SAVE{slot}.DAT, or (off Windows) the existing file whose name differs from it only in case.</summary>
+    public static string PathFor(GameFolder game, int slot) => FileNames.In(Directory ?? game.Root, $"SAVE{slot}.DAT");
 
     public static SaveFile? Load(string path)
     {

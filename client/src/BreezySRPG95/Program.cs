@@ -97,14 +97,20 @@ public sealed record Options(string GameDir, string? RtpDir, int? StartMap, stri
         return new Options(game, rtp, map, shot, advance, ev, keys, level, give, place, loadSlot, campBefore, saves, choose, scale, fast, frames);
     }
 
-    /// <summary>Next to the exe, or in a parent directory (development layout: ./えるまに).</summary>
+    /// <summary>
+    /// Next to the exe, or in a parent directory (development layout: ./えるまに). SRPGEXEC.EXE in any case off Windows; a
+    /// folder that can't be listed (Linux: a parent the user may pass through but not read) is passed over.
+    /// </summary>
     static string? FindGameFolder()
     {
         for (var d = new DirectoryInfo(AppContext.BaseDirectory); d is not null; d = d.Parent)
         {
-            if (File.Exists(Path.Combine(d.FullName, "SRPGEXEC.EXE"))) return d.FullName;
-            foreach (var sub in d.EnumerateDirectories())
-                if (File.Exists(Path.Combine(sub.FullName, "SRPGEXEC.EXE")) && !sub.Name.Contains("Copy") && !sub.Name.Contains("Play"))
+            if (File.Exists(FileNames.In(d.FullName, "SRPGEXEC.EXE"))) return d.FullName;
+            DirectoryInfo[] subs;
+            try { subs = d.GetDirectories(); }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException) { continue; }
+            foreach (var sub in subs)
+                if (File.Exists(FileNames.In(sub.FullName, "SRPGEXEC.EXE")) && !sub.Name.Contains("Copy") && !sub.Name.Contains("Play"))
                     return sub.FullName;
         }
         return null;
