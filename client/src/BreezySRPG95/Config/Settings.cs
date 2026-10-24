@@ -168,7 +168,10 @@ public sealed class Settings
                 ActionMenuFromTop = true,
                 ConfirmSound = ConfirmSound.On,
             };
-        foreach (var path in Candidates())
+        // the earlier names' settings carry over only into a first start (no BreezySRPG95 folder yet): one deleted to
+        // start afresh brings back the defaults, not those
+        bool firstStart = !Directory.Exists(System.IO.Path.GetDirectoryName(UserSettings));
+        foreach (var path in Candidates().Where(p => firstStart || !OldSettings.Contains(p)))
         {
             if (!File.Exists(path)) continue;
             try
