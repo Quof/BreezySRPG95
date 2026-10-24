@@ -101,6 +101,17 @@ public sealed partial class Battlefield
     }
 
     /// <summary>
+    /// The weakness aid (modern): a damage spell whose attributes hit a weakness of <paramref name="t"/>'s class that its
+    /// armour doesn't guard, so that its power goes up by half (<see cref="Combat.Effective"/>).
+    /// </summary>
+    public bool SpellEffective(Magic m, BattleUnit t) =>
+        m.Type == 0 && Combat.Effective(m.AttackAttr, Class(t).Weakness, Item(t.Armor)?.S.ArmDefenseAttr);
+
+    /// <summary>The same for a unit's weapon against <paramref name="def"/> (its attack up by half).</summary>
+    public bool WeaponEffective(BattleUnit atk, BattleUnit def) =>
+        Item(atk.Weapon) is { } w && Combat.Effective(w.S.WpnAttackAttr, Class(def).Weakness, Item(def.Armor)?.S.ArmDefenseAttr);
+
+    /// <summary>
     /// A spell at (aimX, aimY), rolled when it's cast (FUN_0041c8c0): the caster's TP after it — the cost off, none from a
     /// magic item, which works otherwise the same (FUN_0040fda8 calls the same function) — and an effect for each unit it
     /// affects, in the map's row order (FUN_0041ba0c). EXP (FUN_0041b6ec, FUN_0041ba0c): Damage spells add an attack's

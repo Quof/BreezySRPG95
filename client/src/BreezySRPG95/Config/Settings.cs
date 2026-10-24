@@ -81,7 +81,7 @@ public sealed class Settings
     public bool EdgeScrollHover { get; set; } = true;     // the pointer on the screen frame scrolls the map, no button held
     public string NameTags { get; set; } = DefaultNameTags;   // what a message's first line must look like to be its speaker's name (Ui.NameTags); "" none
     public bool BacklogHidesNames { get; set; } = true;   // the backlog leaves out the speaker's name line
-    public WeaknessOrbs WeaknessOrbs { get; set; }       // the class's attribute weaknesses as orbs on the status window's portrait
+    public WeaknessOrbs WeaknessOrbs { get; set; }       // weaknesses shown: orbs on the status window's portrait, "!" over weak units and an arrow in the forecast
     public MapHp MapHp { get; set; } = MapHp.Off;        // each unit's HP under it on the map (MapSession.HpShown)
     public int UnitSpeed { get; set; } = 2;               // units walk on the battle map at this many times the original's pace
     public bool AutoEndTurn { get; set; }                 // the turn ends by itself once every unit of the player's has acted

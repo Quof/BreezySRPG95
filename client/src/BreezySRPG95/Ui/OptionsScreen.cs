@@ -269,7 +269,7 @@ public sealed class OptionsScreen
         Toggle(T("End the Turn When Every Unit Has Acted", "全員行動後に自動でターン終了"), () => _s.AutoEndTurn, v => _s.AutoEndTurn = v),
         Choice(T("Map Unit HP", "マップユニットHP表示"), () => new[] { T("Number", "数値"), T("Gauge", "ゲージ"), T("Off", "OFF") },
             () => (int)_s.MapHp, i => _s.MapHp = (MapHp)i),
-        Choice(T("Weakness Orbs (Unit Status)", "弱点属性の表示（ユニット情報）"), () => new[] { T("Off", "OFF"), T("On", "ON"), T("Colorblind (Letters)", "色覚サポート（文字付き）") },
+        Choice(T("Show Weaknesses", "弱点属性の表示"), () => new[] { T("Off", "OFF"), T("On", "ON"), T("Colorblind (Letters)", "色覚サポート（文字付き）") },
             () => (int)_s.WeaknessOrbs, i => _s.WeaknessOrbs = (WeaknessOrbs)i),
         Gap(),
         Toggle(T("Mouse Input", "マウス操作"), () => _s.MouseInput, v => _s.MouseInput = v),

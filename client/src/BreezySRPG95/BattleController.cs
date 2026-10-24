@@ -1828,7 +1828,8 @@ public sealed class BattleController
     /// <summary>
     /// Battle forecast (modern addition, Fire Emblem style) while choosing a target: both sides' HP before → after
     /// if every strike hits, damage per hit (×n for several strikes), hit and critical chances; "－" where there's no counter.
-    /// The attacker is on the right, as the battle scenes put it.
+    /// The attacker is on the right, as the battle scenes put it. With the weakness aid on, a green arrow by the power of
+    /// a weapon that hits a weakness.
     /// </summary>
     void DrawForecast(SpriteBatch sb, BattleUnit atk, BattleUnit def)
     {
@@ -1837,18 +1838,21 @@ public sealed class BattleController
         int atkAfter = defAfter == 0 ? atk.Hp : Math.Max(0, atk.Hp - fd.Damage * fd.Strikes);
         string Strikes(Battlefield.StrikeForecast f) => f.Strikes == 0 ? "－" : f.Strikes > 1 ? $"{f.Damage} ×{f.Strikes}" : $"{f.Damage}";
         string Pct(int v, Battlefield.StrikeForecast f) => f.Strikes == 0 ? "－" : $"{v}%";
-        ForecastPanel(sb, def, atk, new[]
+        ForecastPanel(sb, def, atk, new ForecastRow[]
         {
-            (Word(2), $"{def.Hp} → {defAfter}", $"{atk.Hp} → {atkAfter}"),
-            ("威力", Strikes(fd), Strikes(fa)),
-            ("命中", Pct(fd.Hit, fd), Pct(fa.Hit, fa)),
-            ("必殺", Pct(fd.Crit, fd), Pct(fa.Crit, fa)),
+            new(Word(2), $"{def.Hp} → {defAfter}", $"{atk.Hp} → {atkAfter}"),
+            new("威力", Strikes(fd), Strikes(fa), LeftUp: WeaknessAid && fd.Strikes > 0 && _s.Field.WeaponEffective(def, atk),
+                RightUp: WeaknessAid && fa.Strikes > 0 && _s.Field.WeaponEffective(atk, def)),
+            new("命中", Pct(fd.Hit, fd), Pct(fa.Hit, fa)),
+            new("必殺", Pct(fd.Crit, fd), Pct(fa.Crit, fa)),
         });
     }
 
     /// <summary>
-    /// The forecast for a spell (modern) on one of the units it reaches (FocusAim): the unit's HP before → after, what
-    /// the spell does to it and its chance to land; the caster's TP before → after (no counter to spells).
+    /// The forecast for a spell (modern) on one of the units it reaches (FocusAim): the unit's HP before → after and the
+    /// caster's TP before → after; what the spell does and its chance to land in the caster's column, as an attack's
+    /// are, "－" on the unit's (no counter to spells). A spell on the caster itself shows it as it will be on both sides.
+    /// With the weakness aid on, a green arrow by the power of a spell that hits a weakness.
     /// </summary>
     void DrawSpellForecast(SpriteBatch sb, BattleUnit caster, Magic m, BattleUnit t, bool fromItem, string? count = null)
     {
@@ -1864,12 +1868,15 @@ public sealed class BattleController
             _ => "無効",
         };
         int mpAfter = fromItem ? caster.Mp : Math.Max(0, caster.Mp - m.MpCost);
-        ForecastPanel(sb, t, caster, new[]
+        bool self = t == caster;
+        string hp = $"{t.Hp} → {after}", mp = $"{caster.Mp} → {mpAfter}";
+        ForecastPanel(sb, t, caster, new ForecastRow[]
         {
-            (Word(2), $"{t.Hp} → {after}", $"{caster.Hp}"),
-            (Word(3), $"{t.Mp}", $"{caster.Mp} → {mpAfter}"),
-            (kind == EffectKind.Heal ? "回復" : kind == EffectKind.Damage ? "威力" : "効果", effect, "－"),
-            ("命中", kind == EffectKind.Resisted ? "－" : $"{hit}%", "－"),
+            new(Word(2), hp, self ? hp : $"{caster.Hp}"),
+            new(Word(3), self ? mp : $"{t.Mp}", mp),
+            new(kind == EffectKind.Heal ? "回復" : kind == EffectKind.Damage ? "威力" : "効果", "－", effect,
+                RightUp: WeaknessAid && kind == EffectKind.Damage && _s.Field.SpellEffective(m, t)),
+            new("命中", "－", kind == EffectKind.Resisted ? "－" : $"{hit}%"),
         }, count);
     }
 
@@ -1885,11 +1892,15 @@ public sealed class BattleController
         _ui.Fill(sb, new Rectangle(p.X + T - 2, p.Y + 2, 2, T - 4), c);
     }
 
+    /// <summary>A forecast's row: its label, the two columns, and whether either gets the weakness aid's green arrow.</summary>
+    readonly record struct ForecastRow(string Label, string Left, string Right, bool LeftUp = false, bool RightUp = false);
+
     /// <summary>
     /// The forecast's panel: <paramref name="left"/> (the one acted on) and <paramref name="right"/> (who acts), named over
-    /// strips in their sides' colours, then the rows; <paramref name="count"/> ("2/3") between the names where it fits.
+    /// strips in their sides' colours, then the rows, each column's figures by its unit's; <paramref name="count"/>
+    /// ("2/3") between the names where it fits.
     /// </summary>
-    void ForecastPanel(SpriteBatch sb, BattleUnit left, BattleUnit right, (string Label, string Left, string Right)[] rows, string? count = null)
+    void ForecastPanel(SpriteBatch sb, BattleUnit left, BattleUnit right, ForecastRow[] rows, string? count = null)
     {
         const int w = 264, h = 122;
         // up and to the right of the two units' tiles; up-left when that would run off the right edge
@@ -1925,6 +1936,97 @@ public sealed class BattleController
             T(rows[k].Label, w / 2, y, dim, 0);
             T(rows[k].Left, 92, y, white, 1);
             T(rows[k].Right, w - 92, y, white, -1);
+            // the arrow just after the figure: past the left column's right edge, after the right column's text
+            if (rows[k].LeftUp) PixelArt(sb, UpArrow, r.X + 94, r.Y + y + 2, ArrowInk, r);
+            if (rows[k].RightUp) PixelArt(sb, UpArrow, r.X + w - 92 + (int)Width(rows[k].Right) + 3, r.Y + y + 2, ArrowInk, r);
+        }
+    }
+
+    /// <summary>The weakness aid (modern): the Show Weaknesses option's other half, on whenever the orbs are.</summary>
+    static bool WeaknessAid => Ui.StatusWindow.Orbs != Config.WeaknessOrbs.Off;
+
+    /// <summary>A green arrow up, 9 × 8 with its dark rim: a weakness's power, up by half.</summary>
+    static readonly string[] UpArrow =
+    {
+        "....o....",
+        "...ogo...",
+        "..oggGo..",
+        ".oggggGo.",
+        "oooggGooo",
+        "..oggGo..",
+        "..oggGo..",
+        "..ooooo..",
+    };
+
+    static Color? ArrowInk(char c) => c switch
+    {
+        'o' => new Color(14, 40, 16), 'g' => new Color(72, 220, 80), 'G' => new Color(40, 160, 52), _ => null,
+    };
+
+    /// <summary>
+    /// The "!" balloon over a unit weak to the attack being chosen, 10 × 12: a yellow balloon, a dark rim and mark, a
+    /// light corner, its tail down to the left, towards the unit.
+    /// </summary>
+    static readonly string[] WeakMark =
+    {
+        ".oooooooo.",
+        "ohhyyyyyyo",
+        "ohyykkyyyo",
+        "oyyykkyyyo",
+        "oyyykkyyyo",
+        "oyyykkyyyo",
+        "oyyyyyyyyo",
+        "oyyykkyyyo",
+        "oyyykkyyyo",
+        ".ooyyoooo.",
+        "..oyyo....",
+        "...oo.....",
+    };
+
+    static Color? MarkInk(char c) => c switch
+    {
+        'o' => new Color(56, 32, 8), 'k' => new Color(72, 24, 8), 'y' => new Color(252, 208, 40), 'h' => new Color(255, 246, 184), _ => null,
+    };
+
+    /// <summary>Pixel art from rows of characters (a colour each, null clear) with its corner at (x, y), cut to <paramref name="clip"/>.</summary>
+    void PixelArt(SpriteBatch sb, string[] art, int x, int y, Func<char, Color?> ink, Rectangle clip)
+    {
+        for (int row = 0; row < art.Length; row++)
+            for (int col = 0; col < art[row].Length;)
+            {
+                char ch = art[row][col];
+                int run = 1;
+                while (col + run < art[row].Length && art[row][col + run] == ch) run++;
+                if (ink(ch) is { } c && Rectangle.Intersect(new Rectangle(x + col, y + row, run, 1), clip) is { Width: > 0 } cut) _ui.Fill(sb, cut, c);
+                col += run;
+            }
+    }
+
+    /// <summary>
+    /// The weakness aid on the map (modern, with Show Weaknesses on): while an attack is being chosen — the spell under the
+    /// spell list's bar or a magic item's under the item list's, the spell being aimed, the weapon while picking whom to
+    /// hit — a "!" balloon over every unit on the map it would hit at half again its power: one the spell affects
+    /// (<see cref="Battlefield.Affects"/>) or the unit may attack (<see cref="Battlefield.Hostile"/>), weak to it and its
+    /// armour not guarding that. The balloon at the tile's top right, half above it, bobbing a pixel.
+    /// </summary>
+    void DrawWeaknessMarks(SpriteBatch sb, Rectangle viewport, int frame)
+    {
+        if (!WeaknessAid || _sel is not { } c) return;
+        Func<BattleUnit, bool> Spell(Magic m) => t => _s.Field.Affects(c, m, t) && _s.Field.SpellEffective(m, t);
+        Func<BattleUnit, bool>? weak = _state_ switch
+        {
+            State.SpellList when _menuIndex >= 0 && _menuIndex < _spells.Count => Spell(_spells[_menuIndex]),
+            State.ItemList when _menuIndex >= 0 && _menuIndex < _items.Count && _s.Field.ItemSpell(_items[_menuIndex]) is { } im => Spell(im),
+            State.Aiming when _aimSpell is { } m => Spell(m),
+            State.Targeting => t => Battlefield.Hostile(c, t) && _s.Field.WeaponEffective(c, t),
+            _ => null,
+        };
+        if (weak is null) return;
+        int bob = frame / 16 % 2;
+        foreach (var u in _s.Field.Alive.Where(u => !u.Hidden && weak(u)))
+        {
+            var p = _s.ScreenPos(u.X, u.Y, viewport).ToPoint();
+            PixelArt(sb, WeakMark, p.X + 19, p.Y - 8 - bob, MarkInk, viewport);
         }
     }
 
@@ -2332,19 +2434,20 @@ public sealed class BattleController
                 sb.Draw(sys, p.ToVector2(), new Rectangle(phase == 1 ? 64 : 96, phase == 0 ? 0 : 32, 32, 32), Color.White);
             if (_state_ == State.Idle && _s.Field.UnitAt(_cursor.X, _cursor.Y) is { } u) DrawHoverLabel(sb, u, p);
         }
+        // a spell's aim reaching several: the frame round the one whose forecast shows; then the weakness balloons over
+        // the cursor and the frame, under the panels and lists
+        bool aimed = _state_ == State.Aiming && _sel is not null && _aimSpell is not null && _aimFocus is { } focus && _aimTargets.Contains(focus);
+        if (aimed && _aimTargets.Count > 1) DrawFocusFrame(sb, _aimFocus!, frame);
+        DrawWeaknessMarks(sb, viewport, frame);
         bool terrain = _state_ is State.Idle or State.Selected or State.Aiming or State.MedicineTarget;
         if (terrain && _s.Field.InBounds(_cursor.X, _cursor.Y)) DrawTerrainInfo(sb);   // modern addition (FE-style)
         if (_state_ is State.ActionMenu or State.TurnMenu && !_s.Panning) DrawMenu(sb, frame);
         if (_state_ == State.Targeting && _sel is not null && _targets.FirstOrDefault(t => t.X == _cursor.X && t.Y == _cursor.Y) is { } ft)
             DrawForecast(sb, _sel, ft);
         // a spell's aim: the forecast for one of the units the spell would reach from there (FocusAim) — with more than
-        // one, that unit framed and the count in the forecast's top line
-        if (_state_ == State.Aiming && _sel is not null && _aimSpell is { } spell && _aimFocus is { } st && _aimTargets.IndexOf(st) is var k and >= 0)
-        {
-            bool several = _aimTargets.Count > 1;
-            if (several) DrawFocusFrame(sb, st, frame);
-            DrawSpellForecast(sb, _sel, spell, st, _aimItem is not null, several ? $"{k + 1}/{_aimTargets.Count}" : null);
-        }
+        // one, the count in the forecast's top line (the frame round that unit drawn above)
+        if (aimed && _aimTargets.IndexOf(_aimFocus!) is var k)
+            DrawSpellForecast(sb, _sel!, _aimSpell!, _aimFocus!, _aimItem is not null, _aimTargets.Count > 1 ? $"{k + 1}/{_aimTargets.Count}" : null);
         if (_state_ == State.WholeMap)
             _s.DrawWholeMap(sb, _ui, _s.Field.Alive.Where(u => !u.Hidden).Select(u => (u.X, u.Y, u.Side switch { Side.Enemy => 0, Side.Ally => 1, _ => 2 })), frame);
         if (_state_ == State.Files)

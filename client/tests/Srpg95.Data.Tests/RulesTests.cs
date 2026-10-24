@@ -156,6 +156,26 @@ public class RulesTests
     }
 
     [Fact]
+    public void Weakness_aid_marks_what_hits_an_unguarded_weakness()
+    {
+        if (Game() is null) return;
+        var f = Map1(out var db);
+        var nasu = f.Units.First(u => u.Unit == 4);   // ナスの分裂君: class ナス, weak to B, D and F
+        var eraser = db.Magic[54];                     // イレイザー: damage, attribute B
+        var fireball = db.Magic[51];                   // ファイアボール: damage, attribute C
+        Assert.True(f.SpellEffective(eraser, nasu));
+        Assert.False(f.SpellEffective(fireball, nasu));
+        // only damage spells: attributes do nothing for the others
+        if (db.Magic.FirstOrDefault(m => m.Type != 0 && m.AttackAttr[1] != 0) is { } support) Assert.False(f.SpellEffective(support, nasu));
+        // armour that guards the attribute takes the weakness away, as it takes away the extra damage
+        if (db.Items.FirstOrDefault(i => i.Type == ItemType.Armor && i.S.ArmDefenseAttr[1] != 0) is { } guard)
+        {
+            nasu.Armor = guard.Index;
+            Assert.False(f.SpellEffective(eraser, nasu));
+        }
+    }
+
+    [Fact]
     public void Damage_spell_costs_mp_hits_the_area_and_gives_exp()
     {
         if (Game() is null) return;
