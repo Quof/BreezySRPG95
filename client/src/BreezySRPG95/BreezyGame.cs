@@ -137,6 +137,9 @@ public sealed class BreezyGame : Game
         _mapIndices = Directory.GetFiles(FileNames.In(_folder.Root, "MAP"), "SMAP_*.DAT", FileNames.AnyCase)
             .Select(p => int.Parse(Path.GetFileNameWithoutExtension(p)[5..]) - 1).Order().ToArray();
         SaveFile.Directory = _opts.SaveDir;
+        _saveSlots = new SaveSlots(_folder);
+        _saveSlots.RefreshLater();   // what the save screen lists, read before it's first opened
+        Ui.SaveMenu.WaitForPictures = _opts.Screenshot is not null;
         int start = _opts.StartMap ?? _db.StartMap;
         if (_opts.LoadSlot is int slot && SaveFile.Load(SaveFile.PathFor(_folder, slot)) is { } save) { ApplySave(save, slot); return; }
         if (_opts.CampBefore is int camp) { OpenCamp(Math.Max(0, Array.IndexOf(_mapIndices, camp)), fromMap: true); return; }
@@ -455,6 +458,7 @@ public sealed class BreezyGame : Game
 
     protected override void Update(GameTime gameTime)
     {
+        while (SaveExtras.Failures.TryDequeue(out var failure)) Trace($"{_frame}: {failure}");   // notes written in the background
         // a scripted run (--screenshot) takes its input from its script alone, never from the real keyboard and mouse; the
         // window takes none while it isn't in front (the pointer is still followed, to be drawn where it is)
         var k = _opts.Screenshot is null && IsActive ? Keyboard.GetState() : default;
@@ -1121,7 +1125,7 @@ public sealed class BreezyGame : Game
         {
             case 0 or 1:
                 _eventSaving = menu.Index == 0;
-                _eventFiles = new Ui.SaveMenu(_eventSaving, _ui, GraphicsDevice, _folder, _db);
+                _eventFiles = new Ui.SaveMenu(_eventSaving, _ui, GraphicsDevice, _folder, _db, _saveSlots);
                 break;
             case 2:
                 _eventMenu = null;
@@ -1156,9 +1160,12 @@ public sealed class BreezyGame : Game
 
     // ---------------- saves: the extended screen, play time and pictures ----------------
 
+    /// <summary>What the extended save / load screen lists, kept up to date in the background.</summary>
+    SaveSlots _saveSlots = null!;
+
     /// <summary>The extended save / load screen, or null for the original's file lists (the "Save / load screen" option).</summary>
     Ui.SaveMenu? MakeSaveMenu(bool saving) =>
-        _settings.SaveScreen == SaveScreen.Extended ? new Ui.SaveMenu(saving, _ui, GraphicsDevice, _folder, _db) : null;
+        _settings.SaveScreen == SaveScreen.Extended ? new Ui.SaveMenu(saving, _ui, GraphicsDevice, _folder, _db, _saveSlots) : null;
 
     /// <summary>
     /// A battle save of the map as it stands into file <paramref name="n"/> (the turn menu's セーブする, FUN_0040be6c),
@@ -1180,16 +1187,20 @@ public sealed class BreezyGame : Game
 
     /// <summary>
     /// A save just written to <paramref name="slot"/>: BreezySRPG95 notes its play time and a picture of the screen beside
-    /// it, and the event it was made in, if any.
+    /// it, and the event it was made in, if any. The picture is taken here; making it a PNG (130 ms with MonoGame's encoder)
+    /// and writing the note go on in the background (<see cref="SaveExtras.WriteLater"/>), after which the save screen's
+    /// list takes the file in.
     /// </summary>
     void NoteSave(int slot, SceneSave? scene)
     {
         Sfx.SaveLoad();
+        _saveSlots.Changed(slot);
         try
         {
             string path = SaveFile.PathFor(_folder, slot);
             if (File.Exists(path))
-                SaveExtras.Write(_folder, slot, File.ReadAllBytes(path), _state.PlayTimeKnown ? _state.PlaySeconds : null, CapturePicture(scene is not null), scene);
+                SaveExtras.WriteLater(_folder, slot, File.ReadAllBytes(path), _state.PlayTimeKnown ? _state.PlaySeconds : null,
+                    CapturePicture(scene is not null), scene, then: _saveSlots.RefreshLater);
         }
         catch (Exception e) { Trace($"{_frame}: no note for save {slot} ({e.Message})"); }   // the save itself stands without it
     }
@@ -1199,9 +1210,9 @@ public sealed class BreezyGame : Game
     /// <summary>
     /// A save's picture: the map or the camp as it stands, drawn again without the menus, the pointer or the client's
     /// windows — the event's message and choice kept for a save made in an event — through the screen's brightness and
-    /// tone, as a 640 × 480 PNG.
+    /// tone, 640 × 480.
     /// </summary>
-    byte[]? CapturePicture(bool scene = false)
+    Png.Image? CapturePicture(bool scene = false)
     {
         if (_camp is null && _session is null) return null;
         int k = Math.Max(1, _scale);
@@ -1232,9 +1243,9 @@ public sealed class BreezyGame : Game
         _sb.Draw(graded, new Rectangle(0, 0, VirtualWidth, VirtualHeight), Color.White);
         _sb.End();
         GraphicsDevice.SetRenderTargets(targets);
-        using var png = new MemoryStream();
-        picture.SaveAsPng(png, VirtualWidth, VirtualHeight);
-        return png.ToArray();
+        var rgba = new byte[VirtualWidth * VirtualHeight * 4];
+        picture.GetData(rgba);
+        return new Png.Image(VirtualWidth, VirtualHeight, rgba);
     }
 
     // ---------------- missing files ----------------
@@ -1798,6 +1809,7 @@ public sealed class BreezyGame : Game
 
     protected override void UnloadContent()
     {
+        SaveExtras.Flush(10_000);   // a save's note still being written
         _tex?.Dispose();
         _ui?.Dispose();
         _audio?.Dispose();

@@ -14,18 +14,16 @@ namespace BreezySRPG95.Ui;
 /// キャンプ / the turn are the save's own data (MAPNAME.DAT's names are left out: they're the author's working names, not
 /// meant for players); the play time and the picture are BreezySRPG95's notes beside the saves (<see cref="SaveExtras"/>):
 /// "--:--:--" and no picture for a save it didn't write. A save made in the middle of an event (<see cref="SceneSave"/>)
-/// says so after its turn.
+/// says so after its turn. The files' details come from <see cref="SaveSlots"/>, kept between visits; the pictures are
+/// read and decoded off the game thread, the chosen file's and those in sight first, and drawn when they're ready.
 /// </summary>
 public sealed class SaveMenu : IDisposable
 {
-    public const int Slots = 100;
+    public const int Slots = SaveSlots.Count;
     public enum Result { None, Cancelled, Picked }
 
-    /// <summary>
-    /// A file's details: its map (1-based) and that map's name, camp or turn, the play time, when it was written, whether
-    /// it has a picture, and whether it was saved in the middle of an event.
-    /// </summary>
-    sealed record Info(int Map, bool Camp, int Turn, double? Play, DateTime Saved, bool Picture, bool Scene);
+    /// <summary>Scripted runs wait for each picture, so that a run's screens come out the same every time.</summary>
+    public static bool WaitForPictures { get; set; }
 
     const int Visible = 5;
     static Rectangle EntryRect(int row) => new(16, 32 + row * 84, 252, 80);
@@ -35,37 +33,27 @@ public sealed class SaveMenu : IDisposable
     readonly bool _saving;
     readonly Ui _ui;
     readonly GraphicsDevice _device;
-    readonly GameFolder _folder;
     readonly Database _db;
-    readonly Info?[] _slots = new Info?[Slots];
-    readonly string _title, _slotPrefix;
+    readonly SaveSlots.Info?[] _slots;
+    readonly string _title, _slotPrefix, _pictures;
     readonly bool _wideDigits;
     int _index, _top;
     Camp.MenuList? _confirm;
-    Texture2D? _picture;
-    (int Slot, int Scale) _pictureFor = (-1, 0);
 
-    public SaveMenu(bool saving, Ui ui, GraphicsDevice device, GameFolder folder, Database db)
+    public SaveMenu(bool saving, Ui ui, GraphicsDevice device, GameFolder folder, Database db, SaveSlots slots)
     {
-        (_saving, _ui, _device, _folder, _db) = (saving, ui, device, folder, db);
+        (_saving, _ui, _device, _db) = (saving, ui, device, db);
         _title = W(saving ? 53 : 54);   // セーブします / ロードします
         // the game's own name for a file (WORD.DAT 81, 「ファイル１」), the number written the same way for every file
         string first = W(81);
         _wideDigits = first.Length > 0 && first[^1] is >= '０' and <= '９';
         _slotPrefix = first.TrimEnd("0123456789０１２３４５６７８９".ToCharArray());
         if (_slotPrefix.Length == 0) _slotPrefix = T("File ", "ファイル");
-        var notes = SaveExtras.Read(folder);
+        _slots = slots.Current();
+        _pictures = SaveExtras.Folder(folder);
         DateTime newest = DateTime.MinValue;
-        for (int n = 1; n <= Slots; n++)
-        {
-            string path = SaveFile.PathFor(folder, n);
-            if (!File.Exists(path) || SaveFile.Load(path) is not { } save) continue;
-            var note = SaveExtras.For(notes, n, save.Raw);
-            var saved = File.GetLastWriteTime(path);
-            _slots[n - 1] = new Info(save.MapIndex + 1, save.AtCamp, (save.Phase + 1) / 2, note?.PlaySeconds, saved,
-                note is not null && File.Exists(SaveExtras.PicturePath(folder, n)), note?.Scene is not null && !save.AtCamp);
-            if (saved > newest) (newest, _index) = (saved, n - 1);   // it opens on the file written last
-        }
+        for (int i = 0; i < Slots; i++)
+            if (_slots[i] is { } info && info.Saved > newest) (newest, _index) = (info.Saved, i);   // it opens on the file written last
         Follow();
         UpdatePicture();
     }
@@ -147,33 +135,107 @@ public sealed class SaveMenu : IDisposable
         return (Result.None, 0);
     }
 
-    /// <summary>The chosen file's picture, made ready at the render scale (outside drawing, where render targets can change).</summary>
+    // ---------------- pictures ----------------
+    // A file's PNG is read and decoded on another thread (5–25 ms, more from a cold disk), one at a time: the chosen
+    // file's first, then those in sight, then a page either way. The chosen one is then drawn at the screen's scale;
+    // until it's ready its frame stays empty.
+
+    readonly Dictionary<int, Png.Image?> _read = new();   // pictures read, by slot from 0 (null: not one Png reads)
+    readonly HashSet<int> _broken = new();   // pictures that couldn't be read at all
+    (int Slot, Task<Png.Image?> Task)? _reading;
+    Texture2D? _source;            // the chosen file's picture as read
+    RenderTarget2D? _picture;      // and at the screen's scale
+    SpriteBatch? _batch;
+    int _pictureSlot = -1, _pictureScale;   // what _picture shows
+
+    bool HasPicture(int slot) => slot is >= 0 and < Slots && _slots[slot] is { Picture: true } && !_broken.Contains(slot);
+
+    Png.Image? ReadPicture(int slot)
+    {
+        try { return Png.Decode(SaveFile.ReadShared(Path.Combine(_pictures, $"SAVE{slot + 1}.png"))); }
+        catch (Exception) { return null; }
+    }
+
+    /// <summary>The order the pictures are wanted in: the chosen file's, those in sight, then a page either way.</summary>
+    IEnumerable<int> Wanted()
+    {
+        yield return _index;
+        for (int slot = _top; slot < _top + Visible; slot++) yield return slot;
+        for (int d = 1; d <= Visible; d++)
+        {
+            yield return _top + Visible - 1 + d;
+            yield return _top - d;
+        }
+    }
+
+    /// <summary>Takes the picture just read, lets go of those now out of reach, and starts on the next one wanted.</summary>
+    void ReadPictures()
+    {
+        if (_reading is { } r && r.Task.IsCompleted)
+        {
+            _read[r.Slot] = r.Task.Result;
+            _reading = null;
+        }
+        foreach (int slot in _read.Keys.Where(s => s != _index && (s < _top - Visible || s >= _top + 2 * Visible)).ToList())
+            _read.Remove(slot);
+        if (_reading is not null) return;
+        foreach (int slot in Wanted())
+            if (HasPicture(slot) && !_read.ContainsKey(slot))
+            {
+                _reading = (slot, Task.Run(() => ReadPicture(slot)));
+                return;
+            }
+    }
+
+    /// <summary>The chosen file's picture, drawn at the render scale once it's read (outside drawing, where render targets can change).</summary>
     void UpdatePicture()
     {
         int k = Math.Max(1, Ui.RenderScale);
-        if (_pictureFor == (_index, k)) return;
-        _pictureFor = (_index, k);
-        _picture?.Dispose();
-        _picture = null;
-        if (_slots[_index] is not { Picture: true }) return;
+        ReadPictures();
+        if (_pictureSlot == _index && _pictureScale == k || !HasPicture(_index)) return;
+        if (!_read.TryGetValue(_index, out var image))
+        {
+            if (!WaitForPictures) return;   // next frame
+            _read[_index] = image = ReadPicture(_index);
+        }
         try
         {
-            using var file = File.OpenRead(SaveExtras.PicturePath(_folder, _index + 1));
-            using var src = Texture2D.FromStream(_device, file);
-            var rt = new RenderTarget2D(_device, PictureRect.Width * k, PictureRect.Height * k);
-            var before = _device.GetRenderTargets();
-            _device.SetRenderTarget(rt);
-            _device.Clear(Color.Black);
-            using (var sb = new SpriteBatch(_device))
+            if (_pictureSlot != _index)
             {
-                sb.Begin(samplerState: SamplerState.LinearClamp);
-                sb.Draw(src, new Rectangle(0, 0, rt.Width, rt.Height), Color.White);
-                sb.End();
+                _pictureSlot = -1;
+                if (image is not null)
+                {
+                    if (_source is null || _source.Width != image.Width || _source.Height != image.Height)
+                    {
+                        _source?.Dispose();
+                        _source = new Texture2D(_device, image.Width, image.Height);
+                    }
+                    _source.SetData(image.Rgba);
+                }
+                else
+                {
+                    // a PNG Png doesn't read (none of its own): MonoGame's reader, here
+                    using var file = File.OpenRead(Path.Combine(_pictures, $"SAVE{_index + 1}.png"));
+                    _source?.Dispose();
+                    _source = Texture2D.FromStream(_device, file);
+                }
             }
+            if (_picture is null || _picture.Width != PictureRect.Width * k)
+            {
+                _picture?.Dispose();
+                _picture = new RenderTarget2D(_device, PictureRect.Width * k, PictureRect.Height * k);
+            }
+            var before = _device.GetRenderTargets();
+            _device.SetRenderTarget(_picture);
+            _device.Clear(Color.Black);
+            _batch ??= new SpriteBatch(_device);
+            _batch.Begin(samplerState: SamplerState.LinearClamp);
+            _batch.Draw(_source!, new Rectangle(0, 0, _picture.Width, _picture.Height), Color.White);
+            _batch.End();
             _device.SetRenderTargets(before);
-            _picture = rt;
+            (_pictureSlot, _pictureScale) = (_index, k);
         }
-        catch (Exception) { _picture = null; }   // an unreadable picture: none
+        catch (Exception) { _broken.Add(_index); }   // an unreadable picture: none
     }
 
     // ---------------- drawing ----------------
@@ -191,7 +253,7 @@ public sealed class SaveMenu : IDisposable
         else _ui.NameText.Get(s)?.Draw(sb, new Vector2(x, y), c);
     }
 
-    string Where(Info info) => info.Camp ? T("Camp", "キャンプ")
+    string Where(SaveSlots.Info info) => info.Camp ? T("Camp", "キャンプ")
         : info.Scene ? T($"Turn {info.Turn} (event)", $"ターン {info.Turn}（イベント中）") : T($"Turn {info.Turn}", $"ターン {info.Turn}");
 
     public void Draw(SpriteBatch sb, int frame)
@@ -236,12 +298,13 @@ public sealed class SaveMenu : IDisposable
 
         var frame = new Rectangle(PictureRect.X - 6, PictureRect.Y - 6, PictureRect.Width + 12, PictureRect.Height + 12);
         _ui.Panel(sb, frame);
-        if (_picture is not null) sb.Draw(_picture, PictureRect, Color.White);
+        if (_picture is not null && _pictureSlot == _index) sb.Draw(_picture, PictureRect, Color.White);
         else
         {
             _ui.Fill(sb, PictureRect, Color.Black * 0.45f);
             string none = info is null ? T("Empty", "空き") : T("No picture", "画像なし");
-            Small(sb, none, PictureRect.X + (PictureRect.Width - _ui.Measure12(none)) / 2, PictureRect.Y + PictureRect.Height / 2 - 8, Dim);
+            if (!HasPicture(_index))   // one still being read: the frame alone
+                Small(sb, none, PictureRect.X + (PictureRect.Width - _ui.Measure12(none)) / 2, PictureRect.Y + PictureRect.Height / 2 - 8, Dim);
         }
 
         _ui.Panel(sb, InfoRect);
@@ -272,5 +335,10 @@ public sealed class SaveMenu : IDisposable
         }
     }
 
-    public void Dispose() => _picture?.Dispose();
+    public void Dispose()
+    {
+        _picture?.Dispose();
+        _source?.Dispose();
+        _batch?.Dispose();
+    }
 }

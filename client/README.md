@@ -152,6 +152,8 @@ Fonts: Noto Sans JP and Noto Serif JP travel inside the exe (SIL Open Font Licen
 
 SRPG Maker 95 keeps no play time and no picture, so BreezySRPG95 notes them itself in an `BreezySRPG95` folder beside the saves (`SAVEn.png`, `saves.json`), tied to each save file's contents: a save the original game wrote shows `--:--:--` and no picture, and so does a game continued from one. Play time counts while a map or camp is up and the window is in front.
 
+Opening the screen reads nothing it already knows: the files' details are kept between visits (`Runtime/SaveSlots.cs`) — looked at in the background when the game starts and after each save, and on opening listed again in one go, a file read again only if its time or size changed or the game saved to it — where reading and hashing every save took 30 ms warm and half a second or more from a cold disk. The pictures are read and decoded on another thread, one at a time, the chosen file's first (`Runtime/Png.cs`, which also writes them: about 30 ms where MonoGame's encoder took 130). Saving writes `SAVEn.DAT` at once; the picture's PNG and the note are written after it in the background (`SaveExtras.WriteLater`), in order, each file replaced whole, and whatever reads the notes next waits for them, as does quitting.
+
 ### Saving in the middle of an event
 
 The original saves only from the turn menu and the camp, between events, and a right click does nothing while an event runs. In BreezySRPG95 a right click during an event (a cutscene, a choice, a battle's opening words) opens セーブ / ロード / 環境設定 (Save / Load / Options) at the pointer; the event waits meanwhile.

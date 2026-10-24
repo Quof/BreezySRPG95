@@ -31,9 +31,21 @@ public sealed class SaveFile
     {
         if (!File.Exists(path)) return null;
         byte[] raw;
-        try { raw = File.ReadAllBytes(path); }
+        try { raw = ReadShared(path); }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException) { return null; }   // locked or unreadable: as if not there
         return raw.Length == Size ? new SaveFile(raw) : null;
+    }
+
+    /// <summary>
+    /// A file's bytes, read without stopping anyone writing, moving or deleting it meanwhile: the save list is read off the
+    /// game thread (<see cref="SaveSlots"/>), and the game's own save mustn't fail because the list was reading that file.
+    /// </summary>
+    public static byte[] ReadShared(string path)
+    {
+        using var f = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+        var bytes = new byte[f.Length];
+        f.ReadExactly(bytes);
+        return bytes;
     }
 
     int I32(int off) => BinaryPrimitives.ReadInt32LittleEndian(Raw.AsSpan(off));
