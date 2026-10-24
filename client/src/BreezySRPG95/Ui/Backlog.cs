@@ -8,10 +8,10 @@ namespace BreezySRPG95.Ui;
 /// Text backlog (modern): every message shown since the title, newest at the bottom, over the dimmed screen. Mouse wheel
 /// up (or the backlog key) opens it and scrolls back a message at a time; wheel down scrolls forward and closes it past
 /// the newest; Up / Down (keys or pad) do the same; Cancel or a click closes it. A spoken message shows the face it was
-/// spoken with (flipped as it was), half size in a thin white frame, its text beside it, the top of its letters level
-/// with the frame's top; narration has no frame, its text in the same column. The speaker's 「名前：」 line is its first,
-/// the name alone in gold (left out with <see cref="HideNames"/>). A message is as tall as its frame or its text, so a
-/// long one pushes the next down. The list starts where five framed messages stand centred on the screen, and runs down
+/// spoken with (flipped as it was), half size in a thin white frame, its text beside it, the top of its first line's
+/// letters level with the frame's top, no gap; narration has no frame, its text in the same column. The speaker's
+/// 「名前：」 line is its first, the name alone in gold (left out with <see cref="HideNames"/>). A message is as tall as
+/// its frame or its text, so a long one pushes the next down. The list starts where five framed messages stand centred on the screen, and runs down
 /// from there: a longer message pushes the bottom down, towards the screen's edge.
 /// </summary>
 public sealed class Backlog(Ui ui)
@@ -26,7 +26,7 @@ public sealed class Backlog(Ui ui)
     public static bool HideNames { get; set; }
 
     const int FrameX = 22, FaceSize = 64;      // the face at half its 128 px: whole pixels at a render scale of 2 and up
-    const int TextX = FrameX + FaceSize + 2 + 16, Gap = 16, InkY = 2;   // a framed message's letters from 2 px under the frame's top
+    const int TextX = FrameX + FaceSize + 2 + 16, Gap = 16;
     // the list's room on the 640 × 480 screen: from where five framed messages are centred, down to near the bottom
     const int Top = (480 - (5 * (FaceSize + 2) + 4 * Gap)) / 2, Bottom = 466;
 
@@ -53,29 +53,30 @@ public sealed class Backlog(Ui ui)
     int Height(Entry e)
     {
         int text = Math.Max(1, LineCount(e)) * Ui.LineHeight;
-        return Framed(e) ? Math.Max(FaceSize + 2, TextTop() + text) : text;
+        return Framed(e) ? Math.Max(FaceSize + 2, TextTop(e) + text) : text;
     }
 
-    float _ink;
+    readonly Dictionary<string, float> _inks = new();
     string? _inkKey;
 
     /// <summary>
-    /// Where a framed message's first line is drawn below the frame's top: so that the letters' tops, wherever the font
-    /// puts them in its line, come <see cref="InkY"/> px under it. The font's ink top is read off a rendered line once.
+    /// Where a framed message's first line is drawn below the frame's top: so that the top of its letters, wherever the
+    /// font puts them in its line, is level with the frame's top row. Read off the rendered line, once a line and font.
     /// </summary>
-    int TextTop()
+    int TextTop(Entry e)
     {
-        if (ui.Text.Get("国あ") is not { } t) return InkY;
-        string key = $"{Ui.Skin}/{Ui.Font}/{ui.Text.FaceName}/{ui.Text.Height}/{t.Scale}/{t.Lift}/{t.Texture.Width}x{t.Texture.Height}";
-        if (key != _inkKey)
+        var (name, text) = Shown(e);
+        if ((name ?? text.FirstOrDefault()) is not { } line || ui.Text.Get(line) is not { } t) return 0;
+        string key = $"{Ui.Skin}/{Ui.Font}/{ui.Text.FaceName}/{ui.Text.Height}/{t.Scale}/{t.Lift}";
+        if (key != _inkKey) { _inks.Clear(); _inkKey = key; }
+        if (!_inks.TryGetValue(line, out float ink))
         {
             var px = new Color[t.Texture.Width * t.Texture.Height];
             t.Texture.GetData(px);
             int first = Array.FindIndex(px, c => c.A > 64);
-            _ink = first < 0 ? 0 : first / t.Texture.Width / (float)t.Scale - t.Lift;
-            _inkKey = key;
+            _inks[line] = ink = first < 0 ? 0 : first / t.Texture.Width / (float)t.Scale - t.Lift;
         }
-        return (int)MathF.Round(InkY - _ink);
+        return (int)MathF.Round(-ink);
     }
 
     /// <summary>How many of the newest messages can be scrolled past while older ones still fill the screen.</summary>
@@ -132,7 +133,7 @@ public sealed class Backlog(Ui ui)
                     e.Flip ? SpriteEffects.FlipHorizontally : SpriteEffects.None, 0);
             }
             var (name, text) = Shown(e);
-            int ty = y + (Framed(e) ? TextTop() : 0);
+            int ty = y + (Framed(e) ? TextTop(e) : 0);
             if (name is not null) { ui.ShadowText(sb, ui.Text, name, new Vector2(TextX, ty), Ui.GoldLight); ty += Ui.LineHeight; }
             for (int k = 0; k < text.Count; k++)
                 ui.ShadowText(sb, ui.Text, text[k], new Vector2(TextX, ty + k * Ui.LineHeight), ink);
