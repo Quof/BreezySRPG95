@@ -18,6 +18,7 @@ public sealed class GdiText : ITextFont
     readonly IntPtr _dc, _font;
     /// <summary>Bold text (the original's weight 700): the smooth faces' heavier cut.</summary>
     readonly bool _strong;
+    readonly int _weight;
     IntPtr _selected;
     /// <summary>The smooth faces made so far, by font and render scale.</summary>
     readonly Dictionary<(UiFont Font, int Scale), Smooth> _smooth = new();
@@ -42,6 +43,7 @@ public sealed class GdiText : ITextFont
             (height, weight) = (int.Parse(hs), int.Parse(ws));
         Height = height;
         _strong = weight >= 700;
+        _weight = weight;
         _dc = CreateCompatibleDC(IntPtr.Zero);
         // MS Gothic is what the original used; the others ship with every Windows 10/11.
         foreach (var face in new[] { "ＭＳ ゴシック", "MS Gothic", "Yu Gothic", "Meiryo" })
@@ -98,10 +100,12 @@ public sealed class GdiText : ITextFont
     /// status window's class (a 16-px face would tower over the 12-px line it shares). Its English and Japanese family
     /// names (GDI reports the one for the system's language). Null for a smooth font. DotGothic16 itself draws each dot as
     /// its own square with gaps between them, and GDI without anti-aliasing fills the gaps in dense kanji (魔's top half a
-    /// solid block): it's carried rebuilt, every dot a whole pixel's square.
+    /// solid block): it's carried rebuilt, every dot a whole pixel's square. MS Gothic is one too, as the original draws
+    /// it: at the text's own height, where Windows uses the font's hand-made bitmaps (and the text's weight; see MakePixel).
     /// </summary>
     static (string[] Faces, int Px)? Pixel(UiFont f, int height) => (f, height >= 16) switch
     {
+        (UiFont.MsGothic, _) => (new[] { "ＭＳ ゴシック", "MS Gothic" }, height),
         (UiFont.PixelDot, true) => (new[] { "DotGothic16 Pixel" }, 16),   // DotGothic16 rebuilt dot for dot (tools/make_pixel_font.py)
         (UiFont.PixelDot, false) => (new[] { "PixelMplus12" }, 12),
         (UiFont.KhDot, true) => (new[] { "KH Dot Kodenmachou 16", "KHドット小伝馬町16" }, 16),
@@ -172,7 +176,7 @@ public sealed class GdiText : ITextFont
     /// </summary>
     Smooth MakeSmooth(UiFont f, int k)
     {
-        if (Pixel(f, Height) is { } pixel) return MakePixel(pixel.Faces, pixel.Px);
+        if (Pixel(f, Height) is { } pixel) return MakePixel(pixel.Faces, pixel.Px, f == UiFont.MsGothic ? _weight : 400);
         var (faces, weight, size) = Spec(f, _strong);
         int px = Math.Max(1, (int)MathF.Round(Height * size * k)), refPx = Height * k;
         var (font, face) = Create(faces.Concat(Fallback), weight, px);
@@ -188,11 +192,12 @@ public sealed class GdiText : ITextFont
     /// <summary>
     /// A pixel font at the size its dots were designed for, without anti-aliasing, at the 640 × 480 screen's own size (the
     /// frame enlarges it nearest-neighbour, a dot to a square of the window's pixels); centred like a smooth face, on a
-    /// whole pixel. Regular weight even for bold text: a thickened pixel font smears.
+    /// whole pixel. Regular weight even for bold text, a thickened pixel font smearing — except MS Gothic, drawn as bold
+    /// as the original draws it.
     /// </summary>
-    Smooth MakePixel(string[] faces, int px)
+    Smooth MakePixel(string[] faces, int px, int weight = 400)
     {
-        var (font, face) = Create(faces.Concat(Fallback), 400, px, sharp: true);
+        var (font, face) = Create(faces.Concat(Fallback), weight, px, sharp: true);
         var (refFont, _) = Create(Fallback, Spec(UiFont.YuGothic, _strong).Weight, Height);
         var (ascent, _) = Metrics(font);
         var (refAscent, refHeight) = Metrics(refFont);
