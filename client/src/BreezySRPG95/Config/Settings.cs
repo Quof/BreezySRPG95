@@ -63,7 +63,7 @@ public sealed class Settings
     public MusicEngine Music { get; set; } = MusicEngine.SoundFont;
     public string? SoundFont { get; set; }                // null = the built-in GeneralUser GS; else a file name in soundfonts/ or a full path
     public bool LoopMarkers { get; set; }                 // MIDI tracks repeat from their RPG Maker loop marker (SoundFont only)
-    public ConfirmSound ConfirmSound { get; set; }        // the CLICK.WAV "thunk" on confirms and text advances
+    public ConfirmSound ConfirmSound { get; set; } = ConfirmSound.GameplayOnly;   // the CLICK.WAV "thunk" on confirms (at first not when a message is clicked away)
     /// <summary>The on/off confirm sound earlier versions saved (off = <see cref="ConfirmSound.Off"/>); read, never written.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public bool? MessageSound { get; set; }
 
@@ -72,7 +72,7 @@ public sealed class Settings
     /// <summary>The on/off battle scenes earlier versions saved (off = <see cref="BattleSceneMode.Simple"/>); read, never written.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public bool? BattleScenes { get; set; }
     public bool CombatBgm { get; set; } = true;           // the map's battle BGM during battle scenes (off: the phase's music, as a fight leaves it)
-    public bool ActionMenuFromTop { get; set; } = true;   // after a move the pointer goes to the action menu's first entry (off: 行動終了, as the original)
+    public bool ActionMenuFromTop { get; set; }           // after a move the pointer goes to the action menu's first entry (off, at first: 行動終了, as the original)
     public FastForwardMode FastForwardMode { get; set; } = FastForwardMode.Hold;
     public int FastForwardSpeed { get; set; } = 2;
     public bool FastForwardSkipsScenes { get; set; }
@@ -134,6 +134,9 @@ public sealed class Settings
                 FastForwardSkipsScenes = string.Equals(Environment.GetEnvironmentVariable("BREEZY_FFSKIPSCENES"), "on", StringComparison.OrdinalIgnoreCase),
                 UnitSpeed = int.TryParse(Environment.GetEnvironmentVariable("BREEZY_UNITSPEED"), out var walk) ? walk : 2,
                 SkipEnemyTurn = string.Equals(Environment.GetEnvironmentVariable("BREEZY_SKIPENEMY"), "on", StringComparison.OrdinalIgnoreCase),
+                // as before these became the defaults, so that the runs' scripted keys still land where they did
+                ActionMenuFromTop = true,
+                ConfirmSound = ConfirmSound.On,
             };
         foreach (var path in Candidates())
         {

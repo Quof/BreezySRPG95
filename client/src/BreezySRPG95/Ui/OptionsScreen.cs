@@ -145,25 +145,43 @@ public sealed class OptionsScreen
             _s.Fullscreen = false;
             (_s.WindowWidth, _s.WindowHeight) = sizes[i];
         }
+        // the window, then the look, then the rest
         return new()
         {
-            Choice(T("Interface style", "インターフェース"), () => new[] { T("Original", "オリジナル"), T("Gilded", "ゴールド"), T("Modern", "モダン") },
-                () => (int)_s.Skin, i => _s.Skin = (UiSkin)i),
-            Choice(T("Font (Modern / Gilded)", "フォント（モダン・ゴールド）"),
-                () => new[] { "Noto Sans JP", "Noto Serif JP", T("BIZ UDPGothic", "BIZ UDPゴシック"), T("Yu Gothic UI", "游ゴシック UI"), T("MS Gothic (the original's)", "ＭＳ ゴシック（オリジナル）"),
-                    T("Pixel: DotGothic16", "ドット：ドットゴシック16"), T("Pixel: KH Dot", "ドット：KHドット小伝馬町") }
-                    .Select((name, i) => TextFonts.Available((UiFont)i) ? name : name + T(" (not on this PC)", "（このPCにありません）")).ToArray(),
-                () => (int)_s.Font, i => _s.Font = (UiFont)i),
-            Choice(T("Language", "言語"), () => new[] { "English", "日本語" }, () => (int)_s.Language, i => _s.Language = (UiLanguage)i),
             Choice(T("Window size", "画面解像度"), SizeNames, SizeChosen, SizePick),
             Choice(T("Scaling", "拡大方式"),
                 () => new[] { T("Pixel-perfect (whole multiples)", "ドット等倍（整数倍）"), T("Fit (keep 4:3)", "画面に合わせる（4:3）"), T("Stretch", "引き伸ばし") },
                 () => (int)_s.Scaling, i => _s.Scaling = (Scaling)i),
             Choice(T("Filter", "フィルター"), () => new[] { T("Sharp", "シャープ"), T("Smooth", "なめらか") }, () => _s.Smooth ? 1 : 0, i => _s.Smooth = i == 1),
+            Gap(),
+            Choice(T("Interface style", "インターフェース"), () => new[] { T("Original", "オリジナル"), T("Gilded", "ゴールド"), T("Modern", "モダン") },
+                () => (int)_s.Skin, i => _s.Skin = (UiSkin)i),
+            Choice(T("Font (Modern / Gilded)", "フォント（モダン・ゴールド）"),
+                () => FontOrder.Select(f => TextFonts.Available(f) ? FontName(f) : FontName(f) + T(" (not on this PC)", "（このPCにありません）")).ToArray(),
+                () => Math.Max(0, Array.IndexOf(FontOrder, _s.Font)), i => _s.Font = FontOrder[i]),
+            Gap(),
+            Choice(T("Language", "言語"), () => new[] { "English", "日本語" }, () => (int)_s.Language, i => _s.Language = (UiLanguage)i),
             Choice(T("Save / load screen", "セーブ・ロード画面"), () => new[] { T("Extended (100 files)", "拡張（100ファイル）"), T("Original (8 files)", "オリジナル（8ファイル）") },
                 () => (int)_s.SaveScreen, i => _s.SaveScreen = (SaveScreen)i),
         };
     }
+
+    /// <summary>The fonts as the list shows them: the original's, the pixel fonts, the rest.</summary>
+    static readonly UiFont[] FontOrder = { UiFont.MsGothic, UiFont.PixelDot, UiFont.KhDot, UiFont.NotoSerif, UiFont.NotoSans, UiFont.BizUd, UiFont.YuGothic };
+
+    static string FontName(UiFont f) => f switch
+    {
+        UiFont.MsGothic => T("MS Gothic (the original's)", "ＭＳ ゴシック（オリジナル）"),
+        UiFont.PixelDot => T("Pixel: DotGothic16", "ドット：ドットゴシック16"),
+        UiFont.KhDot => T("Pixel: KH Dot", "ドット：KHドット小伝馬町"),
+        UiFont.NotoSerif => "Noto Serif JP",
+        UiFont.NotoSans => "Noto Sans JP",
+        UiFont.BizUd => T("BIZ UDPGothic", "BIZ UDPゴシック"),
+        _ => T("Yu Gothic UI", "游ゴシック UI"),
+    };
+
+    /// <summary>A blank row between groups (skipped by the cursor).</summary>
+    static Row Gap() => new("", () => "");
 
     List<Row> AudioRows()
     {
@@ -176,6 +194,10 @@ public sealed class OptionsScreen
                 Level: () => _s.MusicVolume, SetLevel: v => _s.MusicVolume = v),
             new(T("SE volume", "SEの音量"), () => "", d => _s.SoundVolume = Math.Clamp(_s.SoundVolume + 10 * d, 0, 100), Wheel: true,
                 Level: () => _s.SoundVolume, SetLevel: v => _s.SoundVolume = v),
+            Toggle(T("Combat BGM", "戦闘BGM"), () => _s.CombatBgm, v => _s.CombatBgm = v),
+            Choice(T("Confirm sound (thunk)", "決定音"), () => new[] { T("On", "ON"), T("Gameplay only", "メッセージ送り以外"), T("Off", "OFF") },
+                () => (int)_s.ConfirmSound, i => _s.ConfirmSound = (ConfirmSound)i),
+            Gap(),
             // off Windows there is no Windows MIDI: the choice says so, and the SoundFont plays (Audio.SetSoundFont)
             Choice(T("MIDI playback", "MIDI再生"), () => new[] { OperatingSystem.IsWindows() ? T("Windows MIDI (original)", "Windows MIDI（オリジナル）")
                     : T("Windows MIDI (Windows only)", "Windows MIDI（Windowsのみ）"), T("SoundFont", "サウンドフォント") },
@@ -184,33 +206,34 @@ public sealed class OptionsScreen
                 () => Math.Max(0, fonts.IndexOf(_s.ResolveSoundFont(_gameRoot))),
                 i => _s.SoundFont = fonts[i] == Settings.BuiltIn ? null : Path.GetFileName(fonts[i])),
             Toggle(T("Loop at loop markers (SoundFont)", "ループ位置で繰り返す（サウンドフォント）"), () => _s.LoopMarkers, v => _s.LoopMarkers = v),
-            Toggle(T("Combat BGM", "戦闘BGM"), () => _s.CombatBgm, v => _s.CombatBgm = v),
-            Choice(T("Confirm sound (thunk)", "決定音"), () => new[] { T("On", "ON"), T("Gameplay only", "メッセージ送り以外"), T("Off", "OFF") },
-                () => (int)_s.ConfirmSound, i => _s.ConfirmSound = (ConfirmSound)i),
         };
     }
 
+    // battles and the enemy's turn, fast-forward, the map and menus, the mouse
     List<Row> GameplayRows() => new()
     {
         Choice(T("Battle animations", "戦闘演出"), () => new[] { T("On", "ON"), T("Player units only", "自軍ユニットのみ"), T("Simple", "簡易演出") },
             () => (int)_s.BattleSceneMode, i => _s.BattleSceneMode = (BattleSceneMode)i),
-        Choice(T("Weakness orbs (unit status)", "弱点属性の表示（ユニット情報）"), () => new[] { T("Off", "OFF"), T("On", "ON"), T("Colorblind (letters)", "色覚サポート（文字付き）") },
-            () => (int)_s.WeaknessOrbs, i => _s.WeaknessOrbs = (WeaknessOrbs)i),
-        Toggle(T("End the turn when every unit has acted", "全員行動後に自動でターン終了"), () => _s.AutoEndTurn, v => _s.AutoEndTurn = v),
         Choice(T("Unit movement speed", "ユニット移動速度"), () => WalkSpeeds.Select(n => n == 1 ? T("×1 (original)", "×1（オリジナル）") : $"×{n}").ToArray(),
             () => Math.Max(0, Array.IndexOf(WalkSpeeds, _s.UnitSpeed)), i => _s.UnitSpeed = WalkSpeeds[i]),
         Toggle(T("Skip enemy turn", "敵ターンスキップ"), () => _s.SkipEnemyTurn, v => _s.SkipEnemyTurn = v),
+        Gap(),
         Choice(T("Fast-forward key", "早送りキー"), () => new[] { T("Hold", "押している間"), T("Toggle", "切り替え") },
             () => (int)_s.FastForwardMode, i => _s.FastForwardMode = (FastForwardMode)i),
-        Toggle(T("Hold click / confirm to fast-forward", "クリック・決定キー長押しで早送り"), () => _s.FastForwardMouse, v => _s.FastForwardMouse = v),
-        Toggle(T("Mouse input", "マウス操作"), () => _s.MouseInput, v => _s.MouseInput = v),
-        Toggle(T("Scroll with the pointer at the edge", "画面端にカーソルでスクロール"), () => _s.EdgeScrollHover, v => _s.EdgeScrollHover = v),
-        Choice(T("Action menu starts on", "行動メニューの初期位置"), () => new[] { T("First entry", "先頭"), T("End action (original)", "行動終了（オリジナル）") },
-            () => _s.ActionMenuFromTop ? 0 : 1, i => _s.ActionMenuFromTop = i == 0),
         Choice(T("Fast-forward speed", "早送り速度"), () => Speeds.Select(n => $"×{n}").ToArray(),
             () => Math.Max(0, Array.IndexOf(Speeds, _s.FastForwardSpeed)), i => _s.FastForwardSpeed = Speeds[i]),
         Toggle(T("Fast-forward skips battles", "早送り中は戦闘をスキップ"), () => _s.FastForwardSkipsScenes, v => _s.FastForwardSkipsScenes = v),
         Toggle(T("Fast-forward advances text", "早送りでメッセージを送る"), () => _s.FastForwardAdvancesText, v => _s.FastForwardAdvancesText = v),
+        Toggle(T("Hold click / confirm to fast-forward", "クリック・決定キー長押しで早送り"), () => _s.FastForwardMouse, v => _s.FastForwardMouse = v),
+        Gap(),
+        Choice(T("Action menu starts on", "行動メニューの初期位置"), () => new[] { T("First entry", "先頭"), T("End action (original)", "行動終了（オリジナル）") },
+            () => _s.ActionMenuFromTop ? 0 : 1, i => _s.ActionMenuFromTop = i == 0),
+        Toggle(T("End the turn when every unit has acted", "全員行動後に自動でターン終了"), () => _s.AutoEndTurn, v => _s.AutoEndTurn = v),
+        Choice(T("Weakness orbs (unit status)", "弱点属性の表示（ユニット情報）"), () => new[] { T("Off", "OFF"), T("On", "ON"), T("Colorblind (letters)", "色覚サポート（文字付き）") },
+            () => (int)_s.WeaknessOrbs, i => _s.WeaknessOrbs = (WeaknessOrbs)i),
+        Gap(),
+        Toggle(T("Mouse input", "マウス操作"), () => _s.MouseInput, v => _s.MouseInput = v),
+        Toggle(T("Scroll with the pointer at the edge", "画面端にカーソルでスクロール"), () => _s.EdgeScrollHover, v => _s.EdgeScrollHover = v),
     };
 
     static readonly int[] Speeds = { 2, 3, 4, 6, 8 };
