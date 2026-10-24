@@ -58,6 +58,48 @@
     <Error Condition="'$(_SoundFontHash)' != '$(SoundFontSha256)'" Text="GeneralUser-GS.sf2 download didn't match the expected SHA-256." />
   </Target>
 
+  <!--
+    OpenAL Soft 1.25.2 (Chris Robinson; LGPL, openal/COPYING) in place of the 1.18.1 MonoGame carries, for 64-bit
+    Windows: it says when Windows' default output changes (ALC_SOFT_system_events) and can move a playing device to it
+    (ALC_SOFT_reopen_device), so the sound follows a switch from speakers to headphones (Runtime/AudioDevice.cs). It needs
+    only Windows' own DLLs. Not kept in git: the first build downloads the release's binaries, checks their hash and keeps
+    the 64-bit soft_oal.dll and the licence.
+  -->
+  <PropertyGroup>
+    <OpenAlDir>$(MSBuildThisFileDirectory)openal\</OpenAlDir>
+    <OpenAlDll>$(OpenAlDir)soft_oal.dll</OpenAlDll>
+    <OpenAlRelease>openal-soft-1.25.2-bin</OpenAlRelease>
+    <OpenAlUrl>https://github.com/kcat/openal-soft/releases/download/1.25.2/$(OpenAlRelease).zip</OpenAlUrl>
+    <OpenAlSha256>67A0C4B800BD860C93C04F38CAF8CBE4875F9C84700AC430EFC451F70E265434</OpenAlSha256>
+  </PropertyGroup>
+
+  <Target Name="FetchOpenAl" BeforeTargets="PrepareForBuild" Condition="!Exists('$(OpenAlDll)')">
+    <DownloadFile SourceUrl="$(OpenAlUrl)" DestinationFolder="$(OpenAlDir)" DestinationFileName="$(OpenAlRelease).zip" />
+    <GetFileHash Files="$(OpenAlDir)$(OpenAlRelease).zip" Algorithm="SHA256">
+      <Output TaskParameter="Hash" PropertyName="_OpenAlHash" />
+    </GetFileHash>
+    <Delete Files="$(OpenAlDir)$(OpenAlRelease).zip" Condition="'$(_OpenAlHash)' != '$(OpenAlSha256)'" />
+    <Error Condition="'$(_OpenAlHash)' != '$(OpenAlSha256)'" Text="$(OpenAlRelease).zip download didn't match the expected SHA-256." />
+    <Unzip SourceFiles="$(OpenAlDir)$(OpenAlRelease).zip" DestinationFolder="$(OpenAlDir)unpacked"
+           Include="$(OpenAlRelease)/bin/Win64/soft_oal.dll;$(OpenAlRelease)/COPYING" />
+    <Copy SourceFiles="$(OpenAlDir)unpacked\$(OpenAlRelease)\bin\Win64\soft_oal.dll;$(OpenAlDir)unpacked\$(OpenAlRelease)\COPYING" DestinationFolder="$(OpenAlDir)" />
+    <RemoveDir Directories="$(OpenAlDir)unpacked" />
+    <Delete Files="$(OpenAlDir)$(OpenAlRelease).zip" />
+  </Target>
+
+  <!-- MonoGame's 64-bit Windows soft_oal.dll swapped for that one, wherever it goes (runtimes\win-x64\native\, or beside
+       the program in a win-x64 build and its single file) -->
+  <Target Name="UseNewerOpenAl" AfterTargets="ResolvePackageAssets">
+    <ItemGroup>
+      <_MonoGameOpenAl Include="@(RuntimeTargetsCopyLocalItems)" Condition="'%(Filename)%(Extension)' == 'soft_oal.dll' And '%(RuntimeIdentifier)' == 'win-x64'" />
+      <RuntimeTargetsCopyLocalItems Remove="@(_MonoGameOpenAl)" />
+      <RuntimeTargetsCopyLocalItems Include="@(_MonoGameOpenAl->'$(OpenAlDll)')" />
+      <_MonoGameOpenAlHere Include="@(NativeCopyLocalItems)" Condition="'%(Filename)%(Extension)' == 'soft_oal.dll' And '$(RuntimeIdentifier)' == 'win-x64'" />
+      <NativeCopyLocalItems Remove="@(_MonoGameOpenAlHere)" />
+      <NativeCopyLocalItems Include="@(_MonoGameOpenAlHere->'$(OpenAlDll)')" />
+    </ItemGroup>
+  </Target>
+
   <!-- The icon: 昴の騎士's FACE_003 on a gold-rimmed tile, made by
        client/tools/make_icon.py -->
   <ItemGroup>

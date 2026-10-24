@@ -252,12 +252,13 @@ public sealed class Audio(GameFolder game) : IDisposable
         _bgmOpen = false;
     }
 
-    /// <summary>Call every frame: keeps the synth and the MP3 track fed and restarts MCI BGM when it reaches the end (looping).</summary>
+    /// <summary>Call every frame: keeps the synth and the MP3 track fed, moves the sound to a new default output, and restarts MCI BGM when it reaches the end (looping).</summary>
     public void Update()
     {
         _bgmPlayedMs += GameClock.FrameMs;
         FeedSynth();
         FeedMp3();
+        AudioDevice.Update();
         if (!_bgmOpen || ++_pollFrames < 30) return;
         _pollFrames = 0;
         if (Mci("status breezy_bgm mode") == "stopped") Mci("play breezy_bgm from 0");
@@ -376,6 +377,7 @@ public sealed class Audio(GameFolder game) : IDisposable
         // looked up here: GameFolder isn't thread-safe
         var folders = game.Folders("EFS").Concat(game.Folders("BGM")).Concat(game.Folders("MP3_File")).ToList();
         if (!Muted) foreach (var f in new[] { "CLICK.WAV", "CANCEL.WAV", "BUZZER.WAV", "DOWN.WAV", "LEVELUP.WAV" }) Sound(f);
+        if (!Muted) AudioDevice.Follow();   // the sound is up: it follows Windows' default output from now on
         Task.Run(() =>
         {
             foreach (var dir in folders)

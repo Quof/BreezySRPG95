@@ -35,3 +35,4 @@ client/src/BreezySRPG95/fonts/*.ttf
 # the folder's name before the rename, should a copy of it still be around
 /client/src/Erumani/
 re/exe/
+client/src/BreezySRPG95/openal/
