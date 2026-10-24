@@ -121,7 +121,7 @@ public sealed class OptionsScreen
             _rows.Add(new(T("Back", "戻る"), () => "", Activate: () => Done = true));
         }
         if (page != Page.Main)
-            _rows.AddRange(new[] { new Row("", () => ""), new Row(T("Back", "戻る"), () => "", Activate: () => Open(Parent(page).Page, Parent(page).Row)) });
+            _rows.AddRange(new[] { Gap(), new Row(T("Back", "戻る"), () => "", Activate: () => Open(Parent(page).Page, Parent(page).Row)) });
         _list.Index = page == Page.Main && index == 0 ? _mainIndex : index;
         Refresh();
     }
@@ -199,8 +199,27 @@ public sealed class OptionsScreen
         _ => T("Yu Gothic UI", "游ゴシック UI"),
     };
 
-    /// <summary>A blank row between groups (skipped by the cursor).</summary>
+    /// <summary>A row between groups, skipped by the cursor, drawn as a <see cref="Separator"/>.</summary>
     static Row Gap() => new("", () => "");
+
+    static bool IsGap(Row r) => r.Label.Length == 0 && r.Change is null && r.Activate is null;
+
+    /// <summary>
+    /// A group's divider across the middle of row <paramref name="r"/>: a 1-px line in the skin's accent, strongest at the
+    /// middle and fading out towards both ends (60 % of the row's width), with a small diamond at its centre.
+    /// </summary>
+    void Separator(SpriteBatch sb, Rectangle r)
+    {
+        var c = Ui.Gilded ? Ui.Gold : Ui.Modern ? Ui.Accent : Ui.PanelText;
+        int cx = r.X + r.Width / 2, y = r.Y + r.Height / 2, half = r.Width * 3 / 10;
+        for (int d = 4; d < half; d += 2)
+        {
+            float a = 0.85f * (1 - d / (float)half);
+            _ui.Fill(sb, new Rectangle(cx - d - 2, y, 2, 1), c * a);
+            _ui.Fill(sb, new Rectangle(cx + d, y, 2, 1), c * a);
+        }
+        for (int k = -2; k <= 2; k++) _ui.Fill(sb, new Rectangle(cx - (2 - Math.Abs(k)), y + k, 2 * (2 - Math.Abs(k)) + 1, 1), c);
+    }
 
     List<Row> AudioRows()
     {
@@ -344,7 +363,7 @@ public sealed class OptionsScreen
             () => _waiting == a ? T("press a key… (right click: cancel)", "キーを押してください…（右クリックで取消）")
                 : string.Join(", ", _s.Keys.GetValueOrDefault(a, new()).Select(Controls.Name)),
             Activate: () => _waiting = a)).ToList();
-        rows.Add(new Row("", () => ""));
+        rows.Add(Gap());
         rows.Add(new Row(T("Reset to Defaults", "初期設定に戻す"), () => "", Activate: () => { _s.Keys = Settings.DefaultKeys(); Changed(); }));
         return rows;
     }
@@ -360,7 +379,7 @@ public sealed class OptionsScreen
             () => _waitingPad == a ? T("press a button… (right click: cancel)", "ボタンを押してください…（右クリックで取消）") : "",
             Activate: () => _waitingPad = a,
             Pad: () => _waitingPad == a ? Array.Empty<Buttons>() : _s.Pad.GetValueOrDefault(a) ?? new())));
-        rows.Add(new Row("", () => ""));
+        rows.Add(Gap());
         rows.Add(new Row(T("Reset to Defaults", "初期設定に戻す"), () => "", Activate: () => { _s.Pad = Settings.DefaultPad(); Changed(); }));
         return rows;
     }
@@ -498,6 +517,8 @@ public sealed class OptionsScreen
     {
         _ui.Fill(sb, new Rectangle(0, 0, 640, 480), Color.Black * 0.6f);
         _list.Draw(sb, _ui, _drop is null, frame);
+        for (int k = 0; k < _rows.Count; k++)
+            if (IsGap(_rows[k])) Separator(sb, _list.Row(k));
         // a small ▼ after the values that open a drop-down
         for (int k = 0; k < _rows.Count; k++)
         {
