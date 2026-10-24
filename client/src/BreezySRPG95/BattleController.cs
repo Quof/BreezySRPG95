@@ -1937,22 +1937,25 @@ public sealed class BattleController
             T(rows[k].Left, 92, y, white, 1);
             T(rows[k].Right, w - 92, y, white, -1);
             // the arrow just after the figure: past the left column's right edge, after the right column's text
-            if (rows[k].LeftUp) PixelArt(sb, UpArrow, r.X + 94, r.Y + y + 2, ArrowInk, r);
-            if (rows[k].RightUp) PixelArt(sb, UpArrow, r.X + w - 92 + (int)Width(rows[k].Right) + 3, r.Y + y + 2, ArrowInk, r);
+            if (rows[k].LeftUp) PixelArt(sb, UpArrow, r.X + 94, r.Y + y + 1, ArrowInk, r);
+            if (rows[k].RightUp) PixelArt(sb, UpArrow, r.X + w - 92 + (int)Width(rows[k].Right) + 3, r.Y + y + 1, ArrowInk, r);
         }
     }
 
     /// <summary>The weakness aid (modern): the Show Weaknesses option's other half, on whenever the orbs are.</summary>
     static bool WeaknessAid => Ui.StatusWindow.Orbs != Config.WeaknessOrbs.Off;
 
-    /// <summary>A green arrow up, 9 × 8 with its dark rim: a weakness's power, up by half.</summary>
+    /// <summary>A chunky green arrow up, 9 × 11 with its dark rim (a figure's size): a weakness's power, up by half.</summary>
     static readonly string[] UpArrow =
     {
         "....o....",
         "...ogo...",
         "..oggGo..",
         ".oggggGo.",
+        "oggggggGo",
         "oooggGooo",
+        "..oggGo..",
+        "..oggGo..",
         "..oggGo..",
         "..oggGo..",
         "..ooooo..",
@@ -1963,30 +1966,24 @@ public sealed class BattleController
         'o' => new Color(14, 40, 16), 'g' => new Color(72, 220, 80), 'G' => new Color(40, 160, 52), _ => null,
     };
 
-    /// <summary>
-    /// The "!" balloon over a unit weak to the attack being chosen, 10 × 12: a yellow balloon, a dark rim and mark, a
-    /// light corner, its tail down to the left, towards the unit.
-    /// </summary>
+    /// <summary>The "!" over a unit weak to the attack being chosen, 4 × 12: yellow in a dark rim.</summary>
     static readonly string[] WeakMark =
     {
-        ".oooooooo.",
-        "ohhyyyyyyo",
-        "ohyykkyyyo",
-        "oyyykkyyyo",
-        "oyyykkyyyo",
-        "oyyykkyyyo",
-        "oyyyyyyyyo",
-        "oyyykkyyyo",
-        "oyyykkyyyo",
-        ".ooyyoooo.",
-        "..oyyo....",
-        "...oo.....",
+        ".oo.",
+        "oyyo",
+        "oyyo",
+        "oyyo",
+        "oyyo",
+        "oyyo",
+        "oyyo",
+        ".oo.",
+        ".oo.",
+        "oyyo",
+        "oyyo",
+        ".oo.",
     };
 
-    static Color? MarkInk(char c) => c switch
-    {
-        'o' => new Color(56, 32, 8), 'k' => new Color(72, 24, 8), 'y' => new Color(252, 208, 40), 'h' => new Color(255, 246, 184), _ => null,
-    };
+    static Color? MarkInk(char c) => c switch { 'o' => new Color(56, 32, 8), 'y' => new Color(252, 208, 40), _ => null };
 
     /// <summary>Pixel art from rows of characters (a colour each, null clear) with its corner at (x, y), cut to <paramref name="clip"/>.</summary>
     void PixelArt(SpriteBatch sb, string[] art, int x, int y, Func<char, Color?> ink, Rectangle clip)
@@ -2005,11 +2002,11 @@ public sealed class BattleController
     /// <summary>
     /// The weakness aid on the map (modern, with Show Weaknesses on): while an attack is being chosen — the spell under the
     /// spell list's bar or a magic item's under the item list's, the spell being aimed, the weapon while picking whom to
-    /// hit — a "!" balloon over every unit on the map it would hit at half again its power: one the spell affects
+    /// hit — a "!" over every unit on the map it would hit at half again its power: one the spell affects
     /// (<see cref="Battlefield.Affects"/>) or the unit may attack (<see cref="Battlefield.Hostile"/>), weak to it and its
-    /// armour not guarding that. The balloon at the tile's top right, half above it, bobbing a pixel.
+    /// armour not guarding that. The "!" still, over the middle of the unit's tile, a pixel above it.
     /// </summary>
-    void DrawWeaknessMarks(SpriteBatch sb, Rectangle viewport, int frame)
+    void DrawWeaknessMarks(SpriteBatch sb, Rectangle viewport)
     {
         if (!WeaknessAid || _sel is not { } c) return;
         Func<BattleUnit, bool> Spell(Magic m) => t => _s.Field.Affects(c, m, t) && _s.Field.SpellEffective(m, t);
@@ -2022,11 +2019,10 @@ public sealed class BattleController
             _ => null,
         };
         if (weak is null) return;
-        int bob = frame / 16 % 2;
         foreach (var u in _s.Field.Alive.Where(u => !u.Hidden && weak(u)))
         {
             var p = _s.ScreenPos(u.X, u.Y, viewport).ToPoint();
-            PixelArt(sb, WeakMark, p.X + 19, p.Y - 8 - bob, MarkInk, viewport);
+            PixelArt(sb, WeakMark, p.X + (MapSession.Tile - WeakMark[0].Length) / 2, p.Y - 1 - WeakMark.Length, MarkInk, viewport);
         }
     }
 
@@ -2434,11 +2430,11 @@ public sealed class BattleController
                 sb.Draw(sys, p.ToVector2(), new Rectangle(phase == 1 ? 64 : 96, phase == 0 ? 0 : 32, 32, 32), Color.White);
             if (_state_ == State.Idle && _s.Field.UnitAt(_cursor.X, _cursor.Y) is { } u) DrawHoverLabel(sb, u, p);
         }
-        // a spell's aim reaching several: the frame round the one whose forecast shows; then the weakness balloons over
-        // the cursor and the frame, under the panels and lists
+        // a spell's aim reaching several: the frame round the one whose forecast shows; then the weakness marks over the
+        // cursor and the frame, under the panels and lists
         bool aimed = _state_ == State.Aiming && _sel is not null && _aimSpell is not null && _aimFocus is { } focus && _aimTargets.Contains(focus);
         if (aimed && _aimTargets.Count > 1) DrawFocusFrame(sb, _aimFocus!, frame);
-        DrawWeaknessMarks(sb, viewport, frame);
+        DrawWeaknessMarks(sb, viewport);
         bool terrain = _state_ is State.Idle or State.Selected or State.Aiming or State.MedicineTarget;
         if (terrain && _s.Field.InBounds(_cursor.X, _cursor.Y)) DrawTerrainInfo(sb);   // modern addition (FE-style)
         if (_state_ is State.ActionMenu or State.TurnMenu && !_s.Panning) DrawMenu(sb, frame);
