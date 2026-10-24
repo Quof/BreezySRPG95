@@ -174,7 +174,7 @@ public sealed class OptionsScreen
             Gap(),
             Choice(T("Interface style", "インターフェース"), () => new[] { T("Original", "オリジナル"), T("Gilded", "ゴールド"), T("Modern", "モダン") },
                 () => (int)_s.Skin, i => _s.Skin = (UiSkin)i),
-            Choice(T("Font (Modern / Gilded)", "フォント（モダン・ゴールド）"),
+            Choice(T("Font", "フォント"),
                 () => FontOrder.Select(f => TextFonts.Available(f) ? FontName(f) : FontName(f) + T(" (not on this PC)", "（このPCにありません）")).ToArray(),
                 () => Math.Max(0, Array.IndexOf(FontOrder, _s.Font)), i => _s.Font = FontOrder[i]),
             Gap(),
@@ -232,9 +232,9 @@ public sealed class OptionsScreen
     {
         Choice(T("Battle animations", "戦闘演出"), () => new[] { T("On", "ON"), T("Player units only", "自軍ユニットのみ"), T("Simple", "簡易演出") },
             () => (int)_s.BattleSceneMode, i => _s.BattleSceneMode = (BattleSceneMode)i),
+        Toggle(T("Skip enemy turn", "敵ターンスキップ"), () => _s.SkipEnemyTurn, v => _s.SkipEnemyTurn = v),
         Choice(T("Unit movement speed", "ユニット移動速度"), () => WalkSpeeds.Select(n => n == 1 ? T("×1 (original)", "×1（オリジナル）") : $"×{n}").ToArray(),
             () => Math.Max(0, Array.IndexOf(WalkSpeeds, _s.UnitSpeed)), i => _s.UnitSpeed = WalkSpeeds[i]),
-        Toggle(T("Skip enemy turn", "敵ターンスキップ"), () => _s.SkipEnemyTurn, v => _s.SkipEnemyTurn = v),
         Gap(),
         Choice(T("Fast-forward key", "早送りキー"), () => new[] { T("Hold", "押している間"), T("Toggle", "切り替え") },
             () => (int)_s.FastForwardMode, i => _s.FastForwardMode = (FastForwardMode)i),
@@ -244,8 +244,8 @@ public sealed class OptionsScreen
         Toggle(T("Fast-forward advances text", "早送りでメッセージを送る"), () => _s.FastForwardAdvancesText, v => _s.FastForwardAdvancesText = v),
         Toggle(T("Hold click / confirm to fast-forward", "クリック・決定キー長押しで早送り"), () => _s.FastForwardMouse, v => _s.FastForwardMouse = v),
         Gap(),
-        Choice(T("Action menu starts on", "行動メニューの初期位置"), () => new[] { T("First entry", "先頭"), T("End action (original)", "行動終了（オリジナル）") },
-            () => _s.ActionMenuFromTop ? 0 : 1, i => _s.ActionMenuFromTop = i == 0),
+        Choice(T("Action menu starts on", "行動メニューの初期位置"), () => new[] { T("End action (original)", "行動終了（オリジナル）"), T("First entry", "先頭") },
+            () => _s.ActionMenuFromTop ? 1 : 0, i => _s.ActionMenuFromTop = i == 1),
         Toggle(T("End the turn when every unit has acted", "全員行動後に自動でターン終了"), () => _s.AutoEndTurn, v => _s.AutoEndTurn = v),
         Choice(T("Weakness orbs (unit status)", "弱点属性の表示（ユニット情報）"), () => new[] { T("Off", "OFF"), T("On", "ON"), T("Colorblind (letters)", "色覚サポート（文字付き）") },
             () => (int)_s.WeaknessOrbs, i => _s.WeaknessOrbs = (WeaknessOrbs)i),
@@ -286,16 +286,12 @@ public sealed class OptionsScreen
     }
 
     /// <summary>
-    /// The gamepad's page: the controller found (its buttons drawn as an Xbox or a PlayStation pad's), then each action's
-    /// buttons as pictures; choosing one waits for a button, which is added, or taken off if it was there.
+    /// The gamepad's page: each action's buttons as pictures (an Xbox or a PlayStation pad's, as the controller's name
+    /// says); choosing one waits for a button, which is added, or taken off if it was there.
     /// </summary>
     List<Row> PadRows()
     {
-        var rows = new List<Row>
-        {
-            new(T("Controller", "コントローラー"), () => Controls.PadName() ?? T("none connected", "接続されていません")),
-            new("", () => ""),
-        };
+        var rows = new List<Row>();
         rows.AddRange(Enum.GetValues<GameAction>().Select(a => new Row(ActionName(a),
             () => _waitingPad == a ? T("press a button… (right click: cancel)", "ボタンを押してください…（右クリックで取消）") : "",
             Activate: () => _waitingPad = a,
@@ -310,7 +306,7 @@ public sealed class OptionsScreen
         _list.Set(_rows.Select(r => r.Label).ToArray(), _rows.Select(r => r.Change is not null || r.Activate is not null).ToArray());
         _list.Columns = new[] { _rows.Select(r => r.Value()).ToArray() };
         int w = _page == Page.Main ? 200 : 448;
-        _list.Rect = new Rectangle((640 - w) / 2, _page == Page.Main ? 150 : 32, w, 16 * _rows.Count + 34);
+        _list.Rect = new Rectangle((640 - w) / 2, _page == Page.Main ? 150 : 32, w, 16 * _rows.Count + 16);   // 8 px above and below the rows
         if (_list.Index >= _rows.Count || !_list.Enabled[_list.Index]) _list.Index = Math.Max(0, Array.IndexOf(_list.Enabled, true));
     }
 

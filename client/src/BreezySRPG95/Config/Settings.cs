@@ -47,7 +47,7 @@ public sealed class Settings
     public bool Fullscreen { get; set; }
     public Scaling Scaling { get; set; } = Scaling.Integer;
     public bool Smooth { get; set; }
-    public UiFont Font { get; set; } = UiFont.NotoSerif;
+    public UiFont Font { get; set; } = UiFont.MsGothic;   // the original's
     public UiLanguage Language { get; set; } = UiLanguage.Japanese;   // BreezySRPG95's own menus and messages
     public SaveScreen SaveScreen { get; set; } = SaveScreen.Extended;
 
@@ -59,7 +59,7 @@ public sealed class Settings
     public int SoundVolume { get; set; } = 80;
     public MusicEngine Music { get; set; } = MusicEngine.SoundFont;
     public string? SoundFont { get; set; }                // null = the built-in GeneralUser GS; else a file name in soundfonts/ or a full path
-    public bool LoopMarkers { get; set; }                 // MIDI tracks repeat from their RPG Maker loop marker (SoundFont only)
+    public bool LoopMarkers { get; set; } = true;         // MIDI tracks repeat from their RPG Maker loop marker (SoundFont only)
     public ConfirmSound ConfirmSound { get; set; } = ConfirmSound.GameplayOnly;   // the CLICK.WAV "thunk" on confirms (at first not when a message is clicked away)
 
     // gameplay
@@ -144,7 +144,9 @@ public sealed class Settings
             return new Settings
             {
                 Skin = Enum.TryParse<UiSkin>(Environment.GetEnvironmentVariable("BREEZY_SKIN"), true, out var skin) ? skin : UiSkin.Original,
-                Font = Enum.TryParse<UiFont>(Environment.GetEnvironmentVariable("BREEZY_UIFONT"), true, out var font) ? font : UiFont.NotoSerif,
+                // as before MS Gothic became the default: the original look's own text, the others' Noto Serif JP
+                Font = Enum.TryParse<UiFont>(Environment.GetEnvironmentVariable("BREEZY_UIFONT"), true, out var font) ? font
+                    : string.Equals(Environment.GetEnvironmentVariable("BREEZY_SKIN") ?? "original", "original", StringComparison.OrdinalIgnoreCase) ? UiFont.MsGothic : UiFont.NotoSerif,
                 Language = Enum.TryParse<UiLanguage>(Environment.GetEnvironmentVariable("BREEZY_LANGUAGE"), true, out var lang) ? lang : UiLanguage.English,
                 SaveScreen = Enum.TryParse<SaveScreen>(Environment.GetEnvironmentVariable("BREEZY_SAVESCREEN"), true, out var saves) ? saves : SaveScreen.Extended,
                 CombatBgm = !string.Equals(Environment.GetEnvironmentVariable("BREEZY_COMBATBGM"), "off", StringComparison.OrdinalIgnoreCase),

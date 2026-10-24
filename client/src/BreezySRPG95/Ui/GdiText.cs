@@ -210,7 +210,7 @@ public sealed class GdiText : ITextFont
     /// <summary>The font strings are rendered in now, whether anti-aliased, and at what scale.</summary>
     (IntPtr Font, bool Smooth, int Scale, Smooth? Face) Current()
     {
-        if (!Ui.Restyled) return (_font, false, 1, null);
+        if (Ui.OriginalText) return (_font, false, 1, null);
         bool pixel = Pixel(Ui.Font, Height) is not null;
         int k = pixel ? 1 : Math.Max(1, Ui.RenderScale);
         var key = (Ui.Font, k);
@@ -247,10 +247,10 @@ public sealed class GdiText : ITextFont
     {
         if (s.Length == 0) return null;
         var (font, smooth, k, face) = Current();
-        if ((Ui.Restyled, smooth, k, Ui.Font) != _cacheMode)
+        if ((!Ui.OriginalText, smooth, k, Ui.Font) != _cacheMode)
         {
             ClearCache();
-            _cacheMode = (Ui.Restyled, smooth, k, Ui.Font);
+            _cacheMode = (!Ui.OriginalText, smooth, k, Ui.Font);
         }
         TextImage Image(Texture2D t) => new(t, k, face?.Lift ?? 0, face?.RefHeight ?? 0);
         if (_cache.TryGet(s, out var t)) return Image(t);

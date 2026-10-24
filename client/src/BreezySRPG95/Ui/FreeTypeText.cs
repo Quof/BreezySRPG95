@@ -63,6 +63,7 @@ public sealed class FreeTypeText : ITextFont
     /// <summary>A pixel font's file and the size its dots were made for, for a text of <paramref name="height"/> px (GdiText.Pixel).</summary>
     static (string File, int Px)? Pixel(UiFont f, int height) => (f, height >= 16) switch
     {
+        (UiFont.MsGothic, _) => (FreeTypeFonts.IpaGothic, height),   // MS Gothic's stand-in, dot for dot at the text's height
         (UiFont.PixelDot, true) => (FreeTypeFonts.DotGothic16, 16),
         (UiFont.PixelDot, false) => (FreeTypeFonts.PixelMplus12, 12),
         (UiFont.KhDot, true) => (FreeTypeFonts.KhDot16, 16),
@@ -75,6 +76,7 @@ public sealed class FreeTypeText : ITextFont
     {
         UiFont.NotoSans => FreeTypeFonts.Has(FreeTypeFonts.NotoSans),
         UiFont.NotoSerif => FreeTypeFonts.Has(FreeTypeFonts.NotoSerif),
+        UiFont.MsGothic => FreeTypeFonts.Has(FreeTypeFonts.IpaGothic),
         UiFont.PixelDot or UiFont.KhDot => Pixel(f, 12) is { } small && Pixel(f, 16) is { } large
             && FreeTypeFonts.Has(small.File) && FreeTypeFonts.Has(large.File),
         _ => false,
@@ -82,7 +84,7 @@ public sealed class FreeTypeText : ITextFont
 
     Style Current()
     {
-        bool restyled = Ui.Restyled;
+        bool restyled = !Ui.OriginalText;
         var font = restyled ? Ui.Font : default;
         int k = restyled && Pixel(font, Height) is null ? Math.Max(1, Ui.RenderScale) : 1;
         if (!_styles.TryGetValue((restyled, font, k), out var s)) _styles[(restyled, font, k)] = s = Make(restyled, font, k);
@@ -109,7 +111,7 @@ public sealed class FreeTypeText : ITextFont
             var (asc, h) = FreeTypeFonts.Line(file, pixel.Px);
             var (refAsc, refH) = RefMetrics(Height);
             float lift = MathF.Round(asc - 0.38f * pixel.Px - (refAsc - 0.38f * Height));
-            return new Style(file, weight, pixel.Px, Mono: true, Bold: false, 1, lift, refH, asc, h);
+            return new Style(file, weight, pixel.Px, Mono: true, Bold: font == UiFont.MsGothic && _strong && weight == 0, 1, lift, refH, asc, h);   // MS Gothic as bold as the original's
         }
         {
             // GdiText.MakeSmooth: the face's size at the render scale, the middle of its em box where the reference's is
@@ -160,7 +162,7 @@ public sealed class FreeTypeText : ITextFont
     {
         if (s.Length == 0) return null;
         var st = Current();
-        var mode = (Ui.Restyled, Ui.Restyled ? Ui.Font : default(UiFont), st.Scale);
+        var mode = (!Ui.OriginalText, !Ui.OriginalText ? Ui.Font : default(UiFont), st.Scale);
         if (mode != _cacheMode)
         {
             _cache.Clear();
