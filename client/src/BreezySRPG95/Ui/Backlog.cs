@@ -10,7 +10,8 @@ namespace BreezySRPG95.Ui;
 /// the newest; Cancel or a click closes it. A spoken message shows the face it was spoken with (flipped as it was), half
 /// size in a thin white frame, its text beside it (the speaker's 「名前：」 line left out: the face says who); narration has
 /// no frame, its text in the same column. A message is as tall as its frame or its text, so a long one pushes the next
-/// down.
+/// down. The list starts where five framed messages stand centred on the screen, and runs down from there: a longer
+/// message pushes the bottom down, towards the screen's edge.
 /// </summary>
 public sealed class Backlog(Ui ui)
 {
@@ -21,9 +22,10 @@ public sealed class Backlog(Ui ui)
     int _scroll;   // messages scrolled up from the newest
     public bool Open { get; private set; }
 
-    const int Top = 16, Bottom = 466;          // the list's room on the 640 × 480 screen
     const int FrameX = 22, FaceSize = 64;      // the face at half its 128 px: whole pixels at a render scale of 2 and up
     const int TextX = FrameX + FaceSize + 2 + 16, Gap = 16, TextTop = 2;
+    // the list's room on the 640 × 480 screen: from where five framed messages are centred, down to near the bottom
+    const int Top = (480 - (5 * (FaceSize + 2) + 4 * Gap)) / 2, Bottom = 466;
 
     public void Add(MessageView m)
     {
@@ -83,13 +85,15 @@ public sealed class Backlog(Ui ui)
         if (!Open) return;
         ui.Fill(sb, new Rectangle(0, 0, 640, 480), Color.Black * 0.62f);
         var ink = new Color(242, 242, 242);
-        int y = Bottom, i = _entries.Count - 1 - _scroll;
-        for (; i >= 0; i--)
+        // the newest messages that fit, oldest first from the top
+        int first = _entries.Count - _scroll, used = 0;
+        while (first > 0 && used + Height(_entries[first - 1]) + (used > 0 ? Gap : 0) <= Bottom - Top)
+            used += Height(_entries[--first]) + (used > 0 ? Gap : 0);
+        int y = Top, i = first - 1;
+        for (int j = first; j < _entries.Count - _scroll; j++)
         {
-            var e = _entries[i];
+            var e = _entries[j];
             int h = Height(e);
-            if (y - h < Top) break;
-            y -= h;
             if (Framed(e) && ui.Face(e.Face) is { } face)
             {
                 ui.Frame(sb, new Rectangle(FrameX, y, FaceSize + 2, FaceSize + 2), Color.White);
@@ -99,7 +103,7 @@ public sealed class Backlog(Ui ui)
             var text = Text(e);
             for (int k = 0; k < text.Count; k++)
                 ui.ShadowText(sb, ui.Text, text[k], new Vector2(TextX, y + (Framed(e) ? TextTop : 0) + k * Ui.LineHeight), ink);
-            y -= Gap;
+            y += h + Gap;
         }
         // small white marks where there is more: older messages above, newer below
         if (i >= 0) Triangle(sb, 320, 5, up: true);
