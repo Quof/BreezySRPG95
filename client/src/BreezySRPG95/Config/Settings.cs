@@ -52,8 +52,8 @@ public sealed class Settings
     public SaveScreen SaveScreen { get; set; } = SaveScreen.Extended;
 
     /// <summary>The window's size; 1280 × 960 for one too small to be one.</summary>
-    /// <summary>The name lines all five games write: 「名前：」, with a full-width or a plain colon.</summary>
-    public const string DefaultNameTags = "*： *:";
+    /// <summary>「名前：」, with a full-width or a plain colon (all five games), and 【名前】 (none of them; never mistaken).</summary>
+    public const string DefaultNameTags = "*： *: 【*】";
 
     [JsonIgnore] public (int Width, int Height) WindowSize => WindowWidth >= 320 && WindowHeight >= 240 ? (WindowWidth, WindowHeight) : (1280, 960);
 

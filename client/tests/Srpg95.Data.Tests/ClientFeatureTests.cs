@@ -193,7 +193,7 @@ public class ClientFeatureTests
         {
             Assert.Equal("ジュナ", Name("ジュナ：", "…"));
             Assert.Equal("Juna", Name("Juna:", "…"));
-            Assert.Null(Name("【ジュナ】", "…"));
+            Assert.Equal("ジュナ", Name("【ジュナ】", "…"));
             BreezySRPG95.Ui.Ui.NameTags = "【*】 ＊「";
             Assert.Equal("ジュナ", Name("【ジュナ】", "…"));
             Assert.Equal("ジュナ", Name("ジュナ「", "…"));
