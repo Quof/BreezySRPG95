@@ -1936,10 +1936,33 @@ public sealed class BattleController
             T(rows[k].Label, w / 2, y, dim, 0);
             T(rows[k].Left, 92, y, white, 1);
             T(rows[k].Right, w - 92, y, white, -1);
-            // the arrow just after the figure: past the left column's right edge, after the right column's text
-            if (rows[k].LeftUp) PixelArt(sb, UpArrow, r.X + 94, r.Y + y + 1, ArrowInk, r);
-            if (rows[k].RightUp) PixelArt(sb, UpArrow, r.X + w - 92 + (int)Width(rows[k].Right) + 3, r.Y + y + 1, ArrowInk, r);
+            // the arrow just after the figure, past the left column's right edge or after the right column's text, its
+            // middle level with the figures' (DigitInk)
+            var (inkTop, inkBottom) = DigitInk();
+            int ay = r.Y + y + (int)MathF.Round((inkTop + inkBottom - UpArrow.Length) / 2);
+            if (rows[k].LeftUp) PixelArt(sb, UpArrow, r.X + 94, ay, ArrowInk, r);
+            if (rows[k].RightUp) PixelArt(sb, UpArrow, r.X + w - 92 + (int)Width(rows[k].Right) + 3, ay, ArrowInk, r);
         }
+    }
+
+    (float Top, float Bottom) _digitInk;
+    string? _digitInkKey;
+
+    /// <summary>
+    /// Where the small text's figures have their ink, from the top of a line drawn at y 0 to the bottom of the lowest
+    /// row: read off a rendered "0123456789" once a font and look.
+    /// </summary>
+    (float Top, float Bottom) DigitInk()
+    {
+        if (_ui.SmallText.Get("0123456789") is not { } t) return (0, 12);
+        string key = $"{Ui.Ui.Skin}/{Ui.Ui.Font}/{t.Scale}/{t.Lift}/{t.Texture.Width}x{t.Texture.Height}";
+        if (key == _digitInkKey) return _digitInk;
+        var px = new Color[t.Texture.Width * t.Texture.Height];
+        t.Texture.GetData(px);
+        int first = Array.FindIndex(px, c => c.A > 64), last = Array.FindLastIndex(px, c => c.A > 64);
+        _digitInk = first < 0 ? (0, 12) : (first / t.Texture.Width / (float)t.Scale - t.Lift, (last / t.Texture.Width + 1) / (float)t.Scale - t.Lift);
+        _digitInkKey = key;
+        return _digitInk;
     }
 
     /// <summary>The weakness aid (modern): the Show Weaknesses option's other half, on whenever the orbs are.</summary>
