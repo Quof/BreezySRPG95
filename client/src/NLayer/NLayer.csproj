@@ -8,6 +8,8 @@
     <ImplicitUsings>disable</ImplicitUsings>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <Version>3.0.0</Version>
+    <!-- nothing beside the published single-file exe -->
+    <DebugType Condition="'$(PublishSingleFile)' == 'true'">none</DebugType>
   </PropertyGroup>
 
   <ItemGroup>
