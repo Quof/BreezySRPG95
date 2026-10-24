@@ -422,9 +422,11 @@ public sealed class Ui : IDisposable
             int mx = left ? 192 : right ? 32 : 112, bottom = windowY + 143;
             int bw = Math.Min(BalloonWidth - 2, 17 + TextWidth(said) + 17);
             int bx = left ? mx + 1 : right ? mx + BalloonWidth - 1 - bw : 320 - bw / 2;
-            // the text box from 28 px below the area's top (room for the name box above it), its bottom fixed; lines that
-            // don't fit grow it upwards, the name box going up with it
-            int top = Math.Min(windowY + 16 + 28, bottom - (11 + said.Count * LineHeight + 9));
+            // the text box from 28 px below the area's top (room for the name box above it); lines that don't fit grow it
+            // downwards, its top and the name box staying put — up only as far as it would leave the screen
+            int top = windowY + 16 + 28;
+            bottom = Math.Max(bottom, top + 11 + said.Count * LineHeight + 9);
+            if (bottom > 476) (top, bottom) = (top - (bottom - 476), 476);
             if (who is not null)
             {
                 int w = Math.Max(96, NameText.Measure(who) + 32);
