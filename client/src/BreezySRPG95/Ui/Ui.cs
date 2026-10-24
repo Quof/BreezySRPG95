@@ -364,17 +364,21 @@ public sealed class Ui : IDisposable
         return r;
     }
 
-    static (string Before, string After)[] _nameTags = ParseNameTags(Settings.DefaultNameTags);
+    static (string Before, string After, string Next)[] _nameTags = ParseNameTags(Settings.DefaultNameTags);
 
     /// <summary>
     /// The Nametag detection setting: patterns separated by spaces, * (or ＊) standing for the name, e.g. "*： *:" or
-    /// "【*】"; a pattern without one is what the line ends with. Empty: no message has a speaker.
+    /// "【*】"; a pattern without one is what the line ends with. A | (or ｜) is a line break: what follows it is what the
+    /// second line must start with ("*|「": a name alone on its line, the words under it in 「」), that line staying in the
+    /// text. Empty: no message has a speaker.
     /// </summary>
     public static string NameTags { set => _nameTags = ParseNameTags(value); }
 
-    static (string, string)[] ParseNameTags(string? patterns) => (patterns ?? "").Replace('＊', '*')
+    static (string, string, string)[] ParseNameTags(string? patterns) => (patterns ?? "").Replace('＊', '*').Replace('｜', '|')
         .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)
-        .Select(p => p.IndexOf('*') is var star and >= 0 ? (p[..star], p[(star + 1)..].Replace("*", "")) : ("", p)).ToArray();
+        .Select(p => p.IndexOf('|') is var bar and >= 0 ? (p[..bar], p[(bar + 1)..].Replace("|", "")) : (p, ""))
+        .Select(t => t.Item1.IndexOf('*') is var star and >= 0 ? (t.Item1[..star], t.Item1[(star + 1)..].Replace("*", ""), t.Item2) : ("", t.Item1, t.Item2))
+        .ToArray();
 
     /// <summary>
     /// A message's speaker — its first line when that is just 「name：」 (or what <see cref="NameTags"/> says), as nearly
@@ -385,8 +389,9 @@ public sealed class Ui : IDisposable
     public static (string? Name, IReadOnlyList<string> Text) SplitSpeaker(IReadOnlyList<string> lines)
     {
         if (lines.Count > 0 && lines[0].Trim() is { Length: > 0 } first && !first.Contains("条件"))
-            foreach (var (before, after) in _nameTags)
-                if (first.Length > before.Length + after.Length && first.StartsWith(before, StringComparison.Ordinal) && first.EndsWith(after, StringComparison.Ordinal)
+            foreach (var (before, after, next) in _nameTags)
+                if ((next.Length == 0 || lines.Count > 1 && lines[1].TrimStart().StartsWith(next, StringComparison.Ordinal))
+                    && first.Length > before.Length + after.Length && first.StartsWith(before, StringComparison.Ordinal) && first.EndsWith(after, StringComparison.Ordinal)
                     && first[before.Length..^after.Length].Trim() is { Length: > 0 } name)
                     return (name, lines.Skip(1).ToList());
         return (null, lines);

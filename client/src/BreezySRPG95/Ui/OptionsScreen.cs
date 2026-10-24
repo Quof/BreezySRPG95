@@ -273,6 +273,8 @@ public sealed class OptionsScreen
             T("* = Name", "* ＝ 名前"), T("Space = different patterns.", "スペース ＝ 別のパターン"),
             T("So *: identifies \"Rutee:\" as a name and puts it in the", "例　　*： は「ルーティ：」を名前と判定し、"),
             T("nametag box.", "名前欄に表示します。"),
+            T("| = line break. So *|「 catches a name alone on the line", "| ＝ 改行。例　　*|「 は「で始まる行の上の、"),
+            T("above one starting with 「.", "名前だけの行を判定します。"),
             T("To add more, type them then press enter. ESC to cancel.", "追加するには入力して Enter、Esc で取消。"), "-",
         };
         int w = Math.Max(300, header.Max(_ui.Measure12) + 36), h = 16 * (header.Length + 3) + 16;

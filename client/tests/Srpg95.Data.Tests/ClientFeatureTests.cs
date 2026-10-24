@@ -200,6 +200,14 @@ public class ClientFeatureTests
             Assert.Null(Name("ジュナ：", "…"));
             Assert.Null(Name("【】", "…"));
             Assert.Null(Name("【勝利条件】", "…"));
+            BreezySRPG95.Ui.Ui.NameTags = "*|「 【*】";   // | : a line break, the second line starting with 「
+            Assert.Equal("ムラマサ", Name("ムラマサ", "「ああ！とりあえず確認して", "…」"));
+            Assert.Equal(2, BreezySRPG95.Ui.Ui.SplitSpeaker(new[] { "ムラマサ", "「ああ！", "…」" }).Text.Count);
+            Assert.Null(Name("ムラマサ", "ああ！"));
+            Assert.Null(Name("ムラマサ"));
+            Assert.Equal("フェイ", Name("【フェイ】", "…"));
+            BreezySRPG95.Ui.Ui.NameTags = "*｜「";
+            Assert.Equal("ムラマサ", Name("ムラマサ", "「ああ！"));
             BreezySRPG95.Ui.Ui.NameTags = "：";   // no * : what the line ends with
             Assert.Equal("ジュナ", Name("ジュナ：", "…"));
             BreezySRPG95.Ui.Ui.NameTags = "";
