@@ -112,10 +112,10 @@ public sealed class OptionsScreen
         if (page == Page.Main)
         {
             if (_toTitle is { } title)
-                _rows.Add(new(T("Return to title", "タイトルへ戻る"), () => "",
+                _rows.Add(new(T("Return to Title", "タイトルへ戻る"), () => "",
                     Activate: () => Ask(T("Return to the title screen?", "タイトルへ戻りますか？"), title)));
             if (_quit is { } quit)
-                _rows.Add(new(T("Close the game", "ゲーム終了"), () => "",
+                _rows.Add(new(T("Close the Game", "ゲーム終了"), () => "",
                     Activate: () => Ask(T("Close the game?", "ゲームを終了しますか？"), quit)));
             _rows.Add(new(T("Back", "戻る"), () => "", Activate: () => Done = true));
         }
@@ -128,8 +128,8 @@ public sealed class OptionsScreen
     string PageTitle => _page switch
     {
         Page.Display => T("Display", "画面"), Page.Audio => T("Audio", "サウンド"), Page.Gameplay => T("Gameplay", "ゲーム"),
-        Page.Controls => T("Controls", "操作"), Page.Keyboard => T("Controls: keyboard", "操作：キーボード"),
-        Page.Gamepad => T("Controls: gamepad", "操作：ゲームパッド"), _ => T("Options", "環境設定"),
+        Page.Controls => T("Controls", "操作"), Page.Keyboard => T("Controls: Keyboard", "操作：キーボード"),
+        Page.Gamepad => T("Controls: Gamepad", "操作：ゲームパッド"), _ => T("Options", "環境設定"),
     };
 
     /// <summary>Window sizes to offer: 4:3 sizes the screen can hold (640 × 480 always), the whole multiples marked.</summary>
@@ -166,20 +166,20 @@ public sealed class OptionsScreen
         // the window, then the look, then the rest
         return new()
         {
-            Choice(T("Window size", "画面解像度"), SizeNames, SizeChosen, SizePick),
+            Choice(T("Window Size", "画面解像度"), SizeNames, SizeChosen, SizePick),
             Choice(T("Scaling", "拡大方式"),
-                () => new[] { T("Pixel-perfect (whole multiples)", "ドット等倍（整数倍）"), T("Fit (keep 4:3)", "画面に合わせる（4:3）"), T("Stretch", "引き伸ばし") },
+                () => new[] { T("Pixel-Perfect (Whole Multiples)", "ドット等倍（整数倍）"), T("Fit (Keep 4:3)", "画面に合わせる（4:3）"), T("Stretch", "引き伸ばし") },
                 () => (int)_s.Scaling, i => _s.Scaling = (Scaling)i),
             Choice(T("Filter", "フィルター"), () => new[] { T("Sharp", "シャープ"), T("Smooth", "なめらか") }, () => _s.Smooth ? 1 : 0, i => _s.Smooth = i == 1),
             Gap(),
-            Choice(T("Interface style", "インターフェース"), () => new[] { T("Original", "オリジナル"), T("Gilded", "ゴールド"), T("Modern", "モダン") },
+            Choice(T("Interface Style", "インターフェース"), () => new[] { T("Original", "オリジナル"), T("Gilded", "ゴールド"), T("Modern", "モダン") },
                 () => (int)_s.Skin, i => _s.Skin = (UiSkin)i),
             Choice(T("Font", "フォント"),
-                () => FontOrder.Select(f => TextFonts.Available(f) ? FontName(f) : FontName(f) + T(" (not on this PC)", "（このPCにありません）")).ToArray(),
+                () => FontOrder.Select(f => TextFonts.Available(f) ? FontName(f) : FontName(f) + T(" (Not on This PC)", "（このPCにありません）")).ToArray(),
                 () => Math.Max(0, Array.IndexOf(FontOrder, _s.Font)), i => _s.Font = FontOrder[i]),
             Gap(),
             Choice(T("Language", "言語"), () => new[] { "English", "日本語" }, () => (int)_s.Language, i => _s.Language = (UiLanguage)i),
-            Choice(T("Save / load screen", "セーブ・ロード画面"), () => new[] { T("Extended (100 files)", "拡張（100ファイル）"), T("Original (8 files)", "オリジナル（8ファイル）") },
+            Choice(T("Save / Load Screen", "セーブ・ロード画面"), () => new[] { T("Extended (100 Files)", "拡張（100ファイル）"), T("Original (8 Files)", "オリジナル（8ファイル）") },
                 () => (int)_s.SaveScreen, i => _s.SaveScreen = (SaveScreen)i),
         };
     }
@@ -189,7 +189,7 @@ public sealed class OptionsScreen
 
     static string FontName(UiFont f) => f switch
     {
-        UiFont.MsGothic => T("MS Gothic (the original's)", "ＭＳ ゴシック（オリジナル）"),
+        UiFont.MsGothic => T("MS Gothic (The Original's)", "ＭＳ ゴシック（オリジナル）"),
         UiFont.PixelDot => T("Pixel: DotGothic16", "ドット：ドットゴシック16"),
         UiFont.KhDot => T("Pixel: KH Dot", "ドット：KHドット小伝馬町"),
         UiFont.NotoSerif => "Noto Serif JP",
@@ -205,57 +205,57 @@ public sealed class OptionsScreen
     {
         var fonts = new List<string> { Settings.BuiltIn };
         fonts.AddRange(Settings.FindSoundFonts(_gameRoot));
-        string FontName(string f) => f == Settings.BuiltIn ? T("GeneralUser GS (built-in)", "GeneralUser GS（内蔵）") : Path.GetFileName(f);
+        string FontName(string f) => f == Settings.BuiltIn ? T("GeneralUser GS (Built-In)", "GeneralUser GS（内蔵）") : Path.GetFileName(f);
         return new()
         {
-            new(T("BGM volume", "BGMの音量"), () => "", d => _s.MusicVolume = Math.Clamp(_s.MusicVolume + 10 * d, 0, 100), Wheel: true,
+            new(T("BGM Volume", "BGMの音量"), () => "", d => _s.MusicVolume = Math.Clamp(_s.MusicVolume + 10 * d, 0, 100), Wheel: true,
                 Level: () => _s.MusicVolume, SetLevel: v => _s.MusicVolume = v),
-            new(T("SE volume", "SEの音量"), () => "", d => _s.SoundVolume = Math.Clamp(_s.SoundVolume + 10 * d, 0, 100), Wheel: true,
+            new(T("SE Volume", "SEの音量"), () => "", d => _s.SoundVolume = Math.Clamp(_s.SoundVolume + 10 * d, 0, 100), Wheel: true,
                 Level: () => _s.SoundVolume, SetLevel: v => _s.SoundVolume = v),
             Toggle(T("Combat BGM", "戦闘BGM"), () => _s.CombatBgm, v => _s.CombatBgm = v),
-            Choice(T("Confirm sound (thunk)", "決定音"), () => new[] { T("On", "ON"), T("Gameplay only", "メッセージ送り以外"), T("Off", "OFF") },
+            Choice(T("Confirm Sound (Thunk)", "決定音"), () => new[] { T("On", "ON"), T("Gameplay Only", "メッセージ送り以外"), T("Off", "OFF") },
                 () => (int)_s.ConfirmSound, i => _s.ConfirmSound = (ConfirmSound)i),
             Gap(),
             // off Windows there is no Windows MIDI: the choice says so, and the SoundFont plays (Audio.SetSoundFont)
-            Choice(T("MIDI playback", "MIDI再生"), () => new[] { OperatingSystem.IsWindows() ? T("Windows MIDI (original)", "Windows MIDI（オリジナル）")
-                    : T("Windows MIDI (Windows only)", "Windows MIDI（Windowsのみ）"), T("SoundFont", "サウンドフォント") },
+            Choice(T("MIDI Playback", "MIDI再生"), () => new[] { OperatingSystem.IsWindows() ? T("Windows MIDI (Original)", "Windows MIDI（オリジナル）")
+                    : T("Windows MIDI (Windows Only)", "Windows MIDI（Windowsのみ）"), T("SoundFont", "サウンドフォント") },
                 () => (int)_s.Music, i => _s.Music = (MusicEngine)i),
             Choice(T("SoundFont", "サウンドフォント"), () => fonts.Select(FontName).ToArray(),
                 () => Math.Max(0, fonts.IndexOf(_s.ResolveSoundFont(_gameRoot))),
                 i => _s.SoundFont = fonts[i] == Settings.BuiltIn ? null : Path.GetFileName(fonts[i])),
-            Toggle(T("Loop at loop markers (SoundFont)", "ループ位置で繰り返す（サウンドフォント）"), () => _s.LoopMarkers, v => _s.LoopMarkers = v),
+            Toggle(T("Loop at Loop Markers (SoundFont)", "ループ位置で繰り返す（サウンドフォント）"), () => _s.LoopMarkers, v => _s.LoopMarkers = v),
         };
     }
 
     // battles and the enemy's turn, fast-forward, the map and menus, the mouse
     List<Row> GameplayRows() => new()
     {
-        Choice(T("Battle animations", "戦闘演出"), () => new[] { T("On", "ON"), T("Player units only", "自軍ユニットのみ"), T("Simple", "簡易演出") },
+        Choice(T("Battle Animations", "戦闘演出"), () => new[] { T("On", "ON"), T("Player Units Only", "自軍ユニットのみ"), T("Simple", "簡易演出") },
             () => (int)_s.BattleSceneMode, i => _s.BattleSceneMode = (BattleSceneMode)i),
-        Toggle(T("Skip enemy turn", "敵ターンスキップ"), () => _s.SkipEnemyTurn, v => _s.SkipEnemyTurn = v),
-        Choice(T("Unit movement speed", "ユニット移動速度"), () => WalkSpeeds.Select(n => n == 1 ? T("×1 (original)", "×1（オリジナル）") : $"×{n}").ToArray(),
+        Toggle(T("Skip Enemy Turn", "敵ターンスキップ"), () => _s.SkipEnemyTurn, v => _s.SkipEnemyTurn = v),
+        Choice(T("Unit Movement Speed", "ユニット移動速度"), () => WalkSpeeds.Select(n => n == 1 ? T("×1 (Original)", "×1（オリジナル）") : $"×{n}").ToArray(),
             () => Math.Max(0, Array.IndexOf(WalkSpeeds, _s.UnitSpeed)), i => _s.UnitSpeed = WalkSpeeds[i]),
         Gap(),
-        Choice(T("Fast-forward key", "早送りキー"), () => new[] { T("Hold", "押している間"), T("Toggle", "切り替え") },
+        Choice(T("Fast-Forward Key", "早送りキー"), () => new[] { T("Hold", "押している間"), T("Toggle", "切り替え") },
             () => (int)_s.FastForwardMode, i => _s.FastForwardMode = (FastForwardMode)i),
-        Choice(T("Fast-forward speed", "早送り速度"), () => Speeds.Select(n => $"×{n}").ToArray(),
+        Choice(T("Fast-Forward Speed", "早送り速度"), () => Speeds.Select(n => $"×{n}").ToArray(),
             () => Math.Max(0, Array.IndexOf(Speeds, _s.FastForwardSpeed)), i => _s.FastForwardSpeed = Speeds[i]),
-        Toggle(T("Fast-forward skips battles", "早送り中は戦闘をスキップ"), () => _s.FastForwardSkipsScenes, v => _s.FastForwardSkipsScenes = v),
-        Toggle(T("Fast-forward advances text", "早送りでメッセージを送る"), () => _s.FastForwardAdvancesText, v => _s.FastForwardAdvancesText = v),
-        Toggle(T("Hold click / confirm to fast-forward", "クリック・決定キー長押しで早送り"), () => _s.FastForwardMouse, v => _s.FastForwardMouse = v),
+        Toggle(T("Fast-Forward Skips Battles", "早送り中は戦闘をスキップ"), () => _s.FastForwardSkipsScenes, v => _s.FastForwardSkipsScenes = v),
+        Toggle(T("Fast-Forward Advances Text", "早送りでメッセージを送る"), () => _s.FastForwardAdvancesText, v => _s.FastForwardAdvancesText = v),
+        Toggle(T("Hold Click / Confirm to Fast-Forward", "クリック・決定キー長押しで早送り"), () => _s.FastForwardMouse, v => _s.FastForwardMouse = v),
         Gap(),
-        Choice(T("Action menu starts on", "行動メニューの初期位置"), () => new[] { T("End action (original)", "行動終了（オリジナル）"), T("First entry", "先頭") },
+        Choice(T("Action Menu Starts On", "行動メニューの初期位置"), () => new[] { T("End Action (Original)", "行動終了（オリジナル）"), T("First Entry", "先頭") },
             () => _s.ActionMenuFromTop ? 1 : 0, i => _s.ActionMenuFromTop = i == 1),
-        Toggle(T("End the turn when every unit has acted", "全員行動後に自動でターン終了"), () => _s.AutoEndTurn, v => _s.AutoEndTurn = v),
-        Choice(T("Weakness orbs (unit status)", "弱点属性の表示（ユニット情報）"), () => new[] { T("Off", "OFF"), T("On", "ON"), T("Colorblind (letters)", "色覚サポート（文字付き）") },
+        Toggle(T("End the Turn When Every Unit Has Acted", "全員行動後に自動でターン終了"), () => _s.AutoEndTurn, v => _s.AutoEndTurn = v),
+        Choice(T("Weakness Orbs (Unit Status)", "弱点属性の表示（ユニット情報）"), () => new[] { T("Off", "OFF"), T("On", "ON"), T("Colorblind (Letters)", "色覚サポート（文字付き）") },
             () => (int)_s.WeaknessOrbs, i => _s.WeaknessOrbs = (WeaknessOrbs)i),
         Gap(),
-        Toggle(T("Mouse input", "マウス操作"), () => _s.MouseInput, v => _s.MouseInput = v),
-        Toggle(T("Scroll with the pointer at the edge", "画面端にカーソルでスクロール"), () => _s.EdgeScrollHover, v => _s.EdgeScrollHover = v),
+        Toggle(T("Mouse Input", "マウス操作"), () => _s.MouseInput, v => _s.MouseInput = v),
+        Toggle(T("Scroll with the Pointer at the Edge", "画面端にカーソルでスクロール"), () => _s.EdgeScrollHover, v => _s.EdgeScrollHover = v),
         Gap(),
-        new(T("Nametag detection", "名前欄の判定"), () => _s.NameTags == Settings.DefaultNameTags ? T("Default", "標準")
+        new(T("Nametag Detection", "名前欄の判定"), () => _s.NameTags == Settings.DefaultNameTags ? T("Default", "標準")
             : _s.NameTags.Length == 0 ? T("None", "なし") : _s.NameTags, Activate: OpenNameTags),
-        Toggle(T("Never show nametags in the backlog", "メッセージ履歴に名前を表示しない"), () => _s.BacklogHidesNames, v => _s.BacklogHidesNames = v),
+        Toggle(T("Never Show Nametags in the Backlog", "メッセージ履歴に名前を表示しない"), () => _s.BacklogHidesNames, v => _s.BacklogHidesNames = v),
     };
 
     /// <summary>The Nametag detection box: what it does, the patterns as typed, Default and None under them.</summary>
@@ -267,12 +267,13 @@ public sealed class OptionsScreen
         _tagText = _s.NameTags;
         var header = new[]
         {
-            T("Nametag detection", "名前欄の判定"), "-",
-            T("When a message's first line matches one of these", "メッセージの1行目がこの形のどれかに合うと、"),
-            T("patterns, it is shown as the speaker's name, in the", "話し手の名前として名前欄（ゴールド・モダン）"),
-            T("name box (Gilded and Modern looks) and the backlog.", "とメッセージ履歴に表示します。"),
-            T("* stands for the name; separate patterns with spaces.", "* が名前の部分です。形はスペースで区切ります。"),
-            T("Type, then Enter. Esc: cancel.", "入力して Enter で決定、Esc で取消。"), "-",
+            T("Nametag Detection", "名前欄の判定"), "-",
+            T("Names are identified and shown in the nametag box used in", "名前は次の検索パターンで判定され、オリジナル以外の"),
+            T("the alternative guis by the following search patterns.", "インターフェースの名前欄に表示されます。"),
+            T("* = Name", "* ＝ 名前"), T("Space = different patterns.", "スペース ＝ 別のパターン"),
+            T("So *: identifies \"Rutee:\" as a name and puts it in the", "例：*： は「ルーティ：」を名前と判定し、"),
+            T("nametag box.", "名前欄に表示します。"),
+            T("To add more, type them then press enter. ESC to cancel.", "追加するには入力して Enter、Esc で取消。"), "-",
         };
         int w = Math.Max(300, header.Max(_ui.Measure12) + 36), h = 16 * (header.Length + 3) + 16;
         _tags = new Camp.MenuList { Rect = new Rectangle(320 - w / 2, 240 - h / 2, w, h), Header = header, ItemX = 18, ItemWidth = w - 36 };
@@ -316,17 +317,17 @@ public sealed class OptionsScreen
 
     static string ActionName(GameAction a) => a switch
     {
-        GameAction.Confirm => T("Confirm", "決定"), GameAction.Cancel => T("Cancel / back", "キャンセル／戻る"),
-        GameAction.Info => T("Unit status", "ユニット情報"),
-        GameAction.Up => T("Cursor / menu up", "カーソル・メニュー上"), GameAction.Down => T("Cursor / menu down", "カーソル・メニュー下"),
-        GameAction.Left => T("Cursor left", "カーソル左"), GameAction.Right => T("Cursor right", "カーソル右"),
-        GameAction.CameraUp => T("Camera up (menu up)", "画面スクロール上（メニュー上）"),
-        GameAction.CameraDown => T("Camera down (menu down)", "画面スクロール下（メニュー下）"),
-        GameAction.CameraLeft => T("Camera left", "画面スクロール左"), GameAction.CameraRight => T("Camera right", "画面スクロール右"),
-        GameAction.FastForward => T("Fast-forward", "早送り"), GameAction.Backlog => T("Text backlog", "メッセージ履歴"),
+        GameAction.Confirm => T("Confirm", "決定"), GameAction.Cancel => T("Cancel / Back", "キャンセル／戻る"),
+        GameAction.Info => T("Unit Status", "ユニット情報"),
+        GameAction.Up => T("Cursor / Menu Up", "カーソル・メニュー上"), GameAction.Down => T("Cursor / Menu Down", "カーソル・メニュー下"),
+        GameAction.Left => T("Cursor Left", "カーソル左"), GameAction.Right => T("Cursor Right", "カーソル右"),
+        GameAction.CameraUp => T("Camera Up (Menu Up)", "画面スクロール上（メニュー上）"),
+        GameAction.CameraDown => T("Camera Down (Menu Down)", "画面スクロール下（メニュー下）"),
+        GameAction.CameraLeft => T("Camera Left", "画面スクロール左"), GameAction.CameraRight => T("Camera Right", "画面スクロール右"),
+        GameAction.FastForward => T("Fast-Forward", "早送り"), GameAction.Backlog => T("Text Backlog", "メッセージ履歴"),
         GameAction.Options => T("Options", "環境設定"), GameAction.Fullscreen => T("Fullscreen", "全画面切り替え"),
-        GameAction.SkipCutscene => T("Skip cutscene", "イベントスキップ"),
-        GameAction.EnemyRanges => T("Enemy ranges (all at once)", "敵の行動範囲表示"),
+        GameAction.SkipCutscene => T("Skip Cutscene", "イベントスキップ"),
+        GameAction.EnemyRanges => T("Enemy Ranges (All at Once)", "敵の行動範囲表示"),
         _ => a.ToString(),
     };
 
@@ -337,7 +338,7 @@ public sealed class OptionsScreen
                 : string.Join(", ", _s.Keys.GetValueOrDefault(a, new()).Select(Controls.Name)),
             Activate: () => _waiting = a)).ToList();
         rows.Add(new Row("", () => ""));
-        rows.Add(new Row(T("Reset to defaults", "初期設定に戻す"), () => "", Activate: () => { _s.Keys = Settings.DefaultKeys(); Changed(); }));
+        rows.Add(new Row(T("Reset to Defaults", "初期設定に戻す"), () => "", Activate: () => { _s.Keys = Settings.DefaultKeys(); Changed(); }));
         return rows;
     }
 
@@ -353,7 +354,7 @@ public sealed class OptionsScreen
             Activate: () => _waitingPad = a,
             Pad: () => _waitingPad == a ? Array.Empty<Buttons>() : _s.Pad.GetValueOrDefault(a) ?? new())));
         rows.Add(new Row("", () => ""));
-        rows.Add(new Row(T("Reset to defaults", "初期設定に戻す"), () => "", Activate: () => { _s.Pad = Settings.DefaultPad(); Changed(); }));
+        rows.Add(new Row(T("Reset to Defaults", "初期設定に戻す"), () => "", Activate: () => { _s.Pad = Settings.DefaultPad(); Changed(); }));
         return rows;
     }
 
