@@ -247,6 +247,8 @@ public sealed class OptionsScreen
         Choice(T("Action Menu Starts On", "行動メニューの初期位置"), () => new[] { T("End Action (Original)", "行動終了（オリジナル）"), T("First Entry", "先頭") },
             () => _s.ActionMenuFromTop ? 1 : 0, i => _s.ActionMenuFromTop = i == 1),
         Toggle(T("End the Turn When Every Unit Has Acted", "全員行動後に自動でターン終了"), () => _s.AutoEndTurn, v => _s.AutoEndTurn = v),
+        Choice(T("Map Unit HP", "マップユニットHP表示"), () => new[] { T("Number", "数値"), T("Gauge", "ゲージ"), T("Off", "OFF") },
+            () => (int)_s.MapHp, i => _s.MapHp = (MapHp)i),
         Choice(T("Weakness Orbs (Unit Status)", "弱点属性の表示（ユニット情報）"), () => new[] { T("Off", "OFF"), T("On", "ON"), T("Colorblind (Letters)", "色覚サポート（文字付き）") },
             () => (int)_s.WeaknessOrbs, i => _s.WeaknessOrbs = (WeaknessOrbs)i),
         Gap(),
@@ -330,6 +332,8 @@ public sealed class OptionsScreen
         GameAction.Options => T("Options", "環境設定"), GameAction.Fullscreen => T("Fullscreen", "全画面切り替え"),
         GameAction.SkipCutscene => T("Skip Cutscene", "イベントスキップ"),
         GameAction.EnemyRanges => T("Enemy Ranges (All at Once)", "敵の行動範囲表示"),
+        GameAction.PreviousUnit => T("Previous Unit (Not Yet Acted)", "前の未行動ユニット"),
+        GameAction.NextUnit => T("Next Unit (Not Yet Acted)", "次の未行動ユニット"),
         _ => a.ToString(),
     };
 

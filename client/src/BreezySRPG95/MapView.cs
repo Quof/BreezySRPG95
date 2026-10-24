@@ -619,6 +619,58 @@ public sealed class MapSession : IMapContext
         sb.Draw(tex, cut, new Rectangle(src.X + cut.X - dest.X, src.Y + cut.Y - dest.Y, cut.Width, cut.Height), Color.White);
     }
 
+    /// <summary>The Map Unit HP option: the HP gauge (and number) along the bottom of each unit's tile.</summary>
+    public static Config.MapHp HpShown { get; set; }
+
+    static Texture2D? _pixel;
+
+    /// <summary>A rectangle of one colour, cut to the view.</summary>
+    static void Fill(SpriteBatch sb, Rectangle r, Color c, Rectangle viewport)
+    {
+        if (_pixel is null) { _pixel = new Texture2D(sb.GraphicsDevice, 1, 1); _pixel.SetData(new[] { Color.White }); }
+        var cut = Rectangle.Intersect(r, viewport);
+        if (cut.Width > 0 && cut.Height > 0) sb.Draw(_pixel, cut, c);
+    }
+
+    /// <summary>Digits 3 × 5 dots, a row a byte of three bits (4 the left column).</summary>
+    static readonly byte[][] Digits =
+    {
+        new byte[] { 7, 5, 5, 5, 7 }, new byte[] { 2, 6, 2, 2, 7 }, new byte[] { 7, 1, 7, 4, 7 }, new byte[] { 7, 1, 7, 1, 7 },
+        new byte[] { 5, 5, 7, 1, 1 }, new byte[] { 7, 4, 7, 1, 7 }, new byte[] { 7, 4, 7, 5, 7 }, new byte[] { 7, 1, 2, 2, 2 },
+        new byte[] { 7, 5, 7, 5, 7 }, new byte[] { 7, 5, 7, 1, 7 },
+    };
+
+    /// <summary>Full HP blue, hurt green, a quarter or less red.</summary>
+    static readonly Color HpFull = new(56, 176, 255), HpHurt = new(72, 216, 88), HpLow = new(240, 64, 56), HpBack = new(16, 18, 28);
+
+    /// <summary>
+    /// The HP along the bottom of the 32 × 32 tile: a 2-px gauge in a dark 1-px rim (4 px in all), and with the number,
+    /// the HP in 3 × 5 dots on the dark strip to the gauge's left (7 px in all), so the unit stays in sight above it.
+    /// </summary>
+    static void DrawHp(SpriteBatch sb, BattleUnit u, Vector2 pos, Rectangle viewport)
+    {
+        int max = Math.Max(1, u.MaxHp), hp = Math.Clamp(u.Hp, 0, max);
+        var c = hp >= max ? HpFull : hp * 4 <= max ? HpLow : HpHurt;
+        int x = (int)MathF.Floor(pos.X), bottom = (int)MathF.Floor(pos.Y) + Tile - 1;
+        if (HpShown == Config.MapHp.Gauge)
+        {
+            Fill(sb, new Rectangle(x + 3, bottom - 3, 26, 4), HpBack, viewport);
+            Fill(sb, new Rectangle(x + 4, bottom - 2, 24 * hp / max, 2), c, viewport);
+            return;
+        }
+        string n = hp.ToString();
+        int numW = n.Length * 4 - 1, left = x + 1, gx = left + 1 + numW + 2, gw = x + 31 - 1 - gx;
+        Fill(sb, new Rectangle(left, bottom - 6, x + 31 - left, 7), HpBack, viewport);
+        for (int k = 0; k < n.Length; k++)
+        {
+            var rows = Digits[n[k] - '0'];
+            for (int r = 0; r < 5; r++)
+                for (int b = 0; b < 3; b++)
+                    if ((rows[r] >> (2 - b) & 1) != 0) Fill(sb, new Rectangle(left + 1 + k * 4 + b, bottom - 5 + r, 1, 1), Color.White, viewport);
+        }
+        Fill(sb, new Rectangle(gx, bottom - 4, Math.Max(0, gw * hp / max), 3), c, viewport);
+    }
+
     public void DrawUnits(SpriteBatch sb, Rectangle viewport, int frame, BattleUnit? facing = null)
     {
         var sys = _tex.Get("SYSTEM.BMP");
@@ -636,6 +688,7 @@ public sealed class MapSession : IMapContext
             int row = stepping || chosen ? v.Facing : 0;
             int col = stepping ? FrameCycle[tick / 2 % 6] : chosen ? FrameCycle[tick / 3 % 6] : u.Acted ? 0 : FrameCycle[tick / 4 % 6];
             Clipped(sb, sheet, pos - new Vector2(16, 16), new Rectangle(col * 64, row * 64, 64, 64), viewport);
+            if (HpShown != Config.MapHp.Off && !u.Dead) DrawHp(sb, u, pos, viewport);
             if (stepping || chosen || sys is null) continue;
             if (u.Acted) Clipped(sb, sys, pos + new Vector2(6, 19), new Rectangle(70, 19, 22, 10), viewport);   // END
             if (u.SleepTurns > 0 || u.PoisonTurns > 0)

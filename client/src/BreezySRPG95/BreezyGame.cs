@@ -416,6 +416,7 @@ public sealed class BreezyGame : Game
     void ApplyGameplay()
     {
         Ui.StatusWindow.Orbs = _settings.WeaknessOrbs;
+        MapSession.HpShown = _settings.MapHp;
         if (_session is not null) _session.WalkSpeed = _settings.UnitSpeed;
         if (_runner is not null) _runner.FastForwardAdvancesText = _settings.FastForwardAdvancesText;
         if (_battle is not null)
@@ -602,7 +603,8 @@ public sealed class BreezyGame : Game
         var battleInput = new BattleInput(
             Confirm: input.Confirm, Cancel: input.Cancel, Up: up, Down: down, Left: left, Right: right, MouseTile: MouseTile(),
             MouseMoved: mouseMoved, Click: click, RightClick: rclick, FastForward: input.FastForward,
-            Info: _controls.Pressed(GameAction.Info), Wheel: wheel);
+            Info: _controls.Pressed(GameAction.Info), Wheel: wheel,
+            CycleUnits: (_controls.Repeat(GameAction.NextUnit) ? 1 : 0) - (_controls.Repeat(GameAction.PreviousUnit) ? 1 : 0));
         if (_battle is not null) _battle.MouseVirtual = _mouseVirtual;
         if (_opts.Screenshot is not null && !keyFuzz)   // ignore the real mouse while scripted
             battleInput = Scripted(new BattleInput(input.Confirm, false, false, false, false, false, null, false, false, false, input.FastForward));

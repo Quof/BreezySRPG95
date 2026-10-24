@@ -42,13 +42,14 @@ Change them under F1 > Controls.
 | Space | skip the cutscene |
 | Wheel up / L | text backlog (Up / Down scroll it) |
 | R | every enemy's range |
+| Q / E | previous / next unit that hasn't acted |
 | F1 | options |
 | F4 / Alt+Enter | fullscreen |
 | F5 | pixel-perfect / fit scaling |
 
 Gamepad: A confirm, B cancel, X status, Y options, View fast-forward,
-Menu skip cutscene, LB backlog, RB enemy ranges, D-pad / left stick cursor,
-right stick map.
+Menu skip cutscene, LB backlog, RB enemy ranges, L2 / R2 previous / next
+unit, D-pad / left stick cursor, right stick map.
 
 ## Problems
 

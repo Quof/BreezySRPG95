@@ -10,7 +10,7 @@ public enum GameAction
 {
     Confirm, Cancel, Info, Up, Down, Left, Right,
     CameraUp, CameraDown, CameraLeft, CameraRight,
-    FastForward, Backlog, Options, Fullscreen, SkipCutscene, EnemyRanges,
+    FastForward, Backlog, Options, Fullscreen, SkipCutscene, EnemyRanges, PreviousUnit, NextUnit,
 }
 
 public enum Scaling { Integer, Fit, Stretch }
@@ -33,6 +33,9 @@ public enum ConfirmSound { On, GameplayOnly, Off }
 public enum BattleSceneMode { On, PlayerUnits, Simple }
 /// <summary>The unit status window's weakness orbs: none, coloured orbs, or coloured orbs with their attribute's letter.</summary>
 public enum WeaknessOrbs { Off, On, Colorblind }
+
+/// <summary>Each unit's HP under it on the map: a gauge and the number, the gauge alone, or nothing (the original).</summary>
+public enum MapHp { Number, Gauge, Off }
 
 /// <summary>
 /// Player settings (modern features; none of this exists in the original), kept in %APPDATA%\BreezySRPG95\settings.json
@@ -79,6 +82,7 @@ public sealed class Settings
     public string NameTags { get; set; } = DefaultNameTags;   // what a message's first line must look like to be its speaker's name (Ui.NameTags); "" none
     public bool BacklogHidesNames { get; set; } = true;   // the backlog leaves out the speaker's name line
     public WeaknessOrbs WeaknessOrbs { get; set; }       // the class's attribute weaknesses as orbs on the status window's portrait
+    public MapHp MapHp { get; set; }                     // each unit's HP under it on the map (MapSession.HpShown)
     public int UnitSpeed { get; set; } = 2;               // units walk on the battle map at this many times the original's pace
     public bool AutoEndTurn { get; set; }                 // the turn ends by itself once every unit of the player's has acted
     public bool SkipEnemyTurn { get; set; }               // resolve the enemy phase instantly (no walking, scenes or popups)
@@ -109,6 +113,8 @@ public sealed class Settings
         [GameAction.Fullscreen] = new() { Microsoft.Xna.Framework.Input.Keys.F4 },
         [GameAction.SkipCutscene] = new() { Microsoft.Xna.Framework.Input.Keys.Space },
         [GameAction.EnemyRanges] = new() { Microsoft.Xna.Framework.Input.Keys.R },
+        [GameAction.PreviousUnit] = new() { Microsoft.Xna.Framework.Input.Keys.Q },
+        [GameAction.NextUnit] = new() { Microsoft.Xna.Framework.Input.Keys.E },
     };
 
     /// <summary>
@@ -137,6 +143,8 @@ public sealed class Settings
         [GameAction.Fullscreen] = new(),
         [GameAction.SkipCutscene] = new() { Buttons.Start },
         [GameAction.EnemyRanges] = new() { Buttons.RightShoulder },
+        [GameAction.PreviousUnit] = new() { Buttons.LeftTrigger },
+        [GameAction.NextUnit] = new() { Buttons.RightTrigger },
     };
 
     static readonly JsonSerializerOptions Json = new() { WriteIndented = true, Converters = { new JsonStringEnumConverter() } };
@@ -157,6 +165,7 @@ public sealed class Settings
                 CombatBgm = !string.Equals(Environment.GetEnvironmentVariable("BREEZY_COMBATBGM"), "off", StringComparison.OrdinalIgnoreCase),
                 AutoEndTurn = string.Equals(Environment.GetEnvironmentVariable("BREEZY_AUTOENDTURN"), "on", StringComparison.OrdinalIgnoreCase),
                 WeaknessOrbs = Enum.TryParse<WeaknessOrbs>(Environment.GetEnvironmentVariable("BREEZY_WEAKNESS"), true, out var orbs) ? orbs : WeaknessOrbs.Off,
+                MapHp = Enum.TryParse<MapHp>(Environment.GetEnvironmentVariable("BREEZY_MAPHP"), true, out var hp) ? hp : MapHp.Number,
                 BattleSceneMode = Enum.TryParse<BattleSceneMode>(Environment.GetEnvironmentVariable("BREEZY_BATTLESCENES"), true, out var scenes) ? scenes : BattleSceneMode.On,
                 FastForwardSkipsScenes = string.Equals(Environment.GetEnvironmentVariable("BREEZY_FFSKIPSCENES"), "on", StringComparison.OrdinalIgnoreCase),
                 UnitSpeed = int.TryParse(Environment.GetEnvironmentVariable("BREEZY_UNITSPEED"), out var walk) ? walk : 2,

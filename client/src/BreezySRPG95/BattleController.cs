@@ -9,7 +9,8 @@ namespace BreezySRPG95;
 /// <summary>Per-frame input for the battle map.</summary>
 public readonly record struct BattleInput(
     bool Confirm, bool Cancel, bool Up, bool Down, bool Left, bool Right,
-    Point? MouseTile, bool MouseMoved, bool Click, bool RightClick, bool FastForward, bool Info = false, int Wheel = 0);
+    Point? MouseTile, bool MouseMoved, bool Click, bool RightClick, bool FastForward, bool Info = false, int Wheel = 0,
+    int CycleUnits = 0);
 
 public enum MapOutcome { None, Won, Lost, GameOver, ReturnToTitle }
 
@@ -971,6 +972,7 @@ public sealed class BattleController
         // the auto end turn option: no ターン終了 question, straight to the computer's phase once the map is waiting again
         if (AutoEndTurn && _s.Field.AllyPhase && TurnIsOver()) { EndPlayerTurn(); return; }
         MoveCursor(i);
+        if (i.CycleUnits != 0) CycleUnits(i.CycleUnits);
         var u = _s.Field.UnitAt(_cursor.X, _cursor.Y);
         if ((i.RightClick || i.Info) && u is not null) { _statusUnit = u; (_statusItem, _statusPage, _statusSkill, _statusTop) = (-1, 0, 0, 0); _state_ = State.Status; return; }
         // a right click on an empty tile opens the turn menu too (modern; the original does nothing there)
@@ -990,6 +992,20 @@ public sealed class BattleController
         _reachShown = _s.Field.Flood(u, _s.Field.Stats(u).Movement).Keys.ToHashSet();
         _reachHits = EnemyAi.Hits(_s.Field, u, _reach.Keys).Where(t => !_reachShown.Contains(t)).ToList();
         _state_ = State.Selected;
+    }
+
+    /// <summary>
+    /// The previous / next unit keys (modern): the cursor to the player's previous or next unit, in their order, that can
+    /// still act this turn (not asleep), the view brought round to it as after the opening.
+    /// </summary>
+    void CycleUnits(int step)
+    {
+        var ready = _s.InRecordOrder.Where(u => !u.Dead && u.Side == Side.Ally && !u.Acted && u.SleepTurns == 0).ToList();
+        if (ready.Count == 0) return;
+        int at = ready.FindIndex(u => u.X == _cursor.X && u.Y == _cursor.Y);
+        var next = ready[at < 0 ? (step > 0 ? 0 : ready.Count - 1) : ((at + step) % ready.Count + ready.Count) % ready.Count];
+        _cursor = new Point(next.X, next.Y);
+        _s.ShowTile(next.X, next.Y);
     }
 
     /// <summary>The range shown belongs to an enemy or neutral unit: any click closes it.</summary>
