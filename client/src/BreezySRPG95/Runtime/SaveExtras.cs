@@ -26,23 +26,8 @@ public static class SaveExtras
     /// <summary>The notes' files are read and written by one thread at a time.</summary>
     static readonly object Files = new();
 
-    /// <summary>
-    /// The notes' folder beside the saves. The one from the client's earlier name (EasySRPG95) is renamed to it the first
-    /// time it's needed, so its play times and pictures carry over; should that fail, it stays in use.
-    /// </summary>
-    public static string Folder(GameFolder g)
-    {
-        lock (Files)
-        {
-            string dir = SaveFile.Directory ?? g.Root, folder = Path.Combine(dir, "BreezySRPG95"), old = Path.Combine(dir, "EasySRPG95");
-            if (!Directory.Exists(folder) && Directory.Exists(old))
-            {
-                try { Directory.Move(old, folder); }
-                catch (Exception) { return old; }
-            }
-            return folder;
-        }
-    }
+    /// <summary>The notes' folder beside the saves.</summary>
+    public static string Folder(GameFolder g) => Path.Combine(SaveFile.Directory ?? g.Root, "BreezySRPG95");
     public static string PicturePath(GameFolder g, int slot) => Path.Combine(Folder(g), $"SAVE{slot}.png");
     public static string IndexPath(GameFolder g) => Path.Combine(Folder(g), "saves.json");
 

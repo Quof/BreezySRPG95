@@ -49,10 +49,9 @@ public class ClientFeatureTests
     }
 
     [Fact]
-    public void Window_size_comes_from_the_old_scale_until_one_is_chosen()
+    public void The_window_starts_at_twice_the_games_size()
     {
         Assert.Equal((1280, 960), new Settings().WindowSize);                     // the default, ×2
-        Assert.Equal((1920, 1440), new Settings { WindowScale = 3 }.WindowSize);   // a settings.json from before
         Assert.Equal((1024, 768), new Settings { WindowWidth = 1024, WindowHeight = 768 }.WindowSize);
     }
 

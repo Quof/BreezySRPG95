@@ -109,7 +109,7 @@ The program is one file there too (`BreezySRPG95`), but its three native librari
 
 The icon is 昴の騎士's face graphic FACE_003, made into `src/BreezySRPG95/Icon.ico` by `client/tools/make_icon.py`.
 
-The project, its folder (`src/BreezySRPG95`) and its namespace are all called BreezySRPG95 (it was EasySRPG95 before, and Erumani while it played only えるまに); settings and save notes from the earlier names carry over.
+The project, its folder (`src/BreezySRPG95`) and its namespace are all called BreezySRPG95 (it was EasySRPG95 before, and Erumani while it played only えるまに).
 
 ## Controls
 

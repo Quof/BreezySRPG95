@@ -41,11 +41,9 @@ public enum WeaknessOrbs { Off, On, Colorblind }
 public sealed class Settings
 {
     // display
-    /// <summary>The window's size; 0 × 0 from the older <see cref="WindowScale"/>.</summary>
-    public int WindowWidth { get; set; }
-    public int WindowHeight { get; set; }
-    /// <summary>The window as a multiple of 640 × 480, as earlier versions kept it; read when <see cref="WindowWidth"/> is 0.</summary>
-    public int WindowScale { get; set; } = 2;
+    /// <summary>The window's size (at first 1280 × 960, twice the game's 640 × 480).</summary>
+    public int WindowWidth { get; set; } = 1280;
+    public int WindowHeight { get; set; } = 960;
     public bool Fullscreen { get; set; }
     public Scaling Scaling { get; set; } = Scaling.Integer;
     public bool Smooth { get; set; }
@@ -53,9 +51,8 @@ public sealed class Settings
     public UiLanguage Language { get; set; } = UiLanguage.Japanese;   // BreezySRPG95's own menus and messages
     public SaveScreen SaveScreen { get; set; } = SaveScreen.Extended;
 
-    /// <summary>The window's size, whichever way it was kept.</summary>
-    [JsonIgnore] public (int Width, int Height) WindowSize =>
-        WindowWidth >= 320 && WindowHeight >= 240 ? (WindowWidth, WindowHeight) : (640 * Math.Clamp(WindowScale, 1, 6), 480 * Math.Clamp(WindowScale, 1, 6));
+    /// <summary>The window's size; 1280 × 960 for one too small to be one.</summary>
+    [JsonIgnore] public (int Width, int Height) WindowSize => WindowWidth >= 320 && WindowHeight >= 240 ? (WindowWidth, WindowHeight) : (1280, 960);
 
     // audio
     public int MusicVolume { get; set; } = 80;            // 0–100
@@ -64,13 +61,9 @@ public sealed class Settings
     public string? SoundFont { get; set; }                // null = the built-in GeneralUser GS; else a file name in soundfonts/ or a full path
     public bool LoopMarkers { get; set; }                 // MIDI tracks repeat from their RPG Maker loop marker (SoundFont only)
     public ConfirmSound ConfirmSound { get; set; } = ConfirmSound.GameplayOnly;   // the CLICK.WAV "thunk" on confirms (at first not when a message is clicked away)
-    /// <summary>The on/off confirm sound earlier versions saved (off = <see cref="ConfirmSound.Off"/>); read, never written.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public bool? MessageSound { get; set; }
 
     // gameplay
     public BattleSceneMode BattleSceneMode { get; set; }
-    /// <summary>The on/off battle scenes earlier versions saved (off = <see cref="BattleSceneMode.Simple"/>); read, never written.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public bool? BattleScenes { get; set; }
     public bool CombatBgm { get; set; } = true;           // the map's battle BGM during battle scenes (off: the phase's music, as a fight leaves it)
     public bool ActionMenuFromTop { get; set; }           // after a move the pointer goes to the action menu's first entry (off, at first: 行動終了, as the original)
     public FastForwardMode FastForwardMode { get; set; } = FastForwardMode.Hold;
@@ -85,8 +78,6 @@ public sealed class Settings
     public bool AutoEndTurn { get; set; }                 // the turn ends by itself once every unit of the player's has acted
     public bool SkipEnemyTurn { get; set; }               // resolve the enemy phase instantly (no walking, scenes or popups)
     public UiSkin Skin { get; set; }                      // the windows, menus and text box: the original look or a restyled one
-    /// <summary>The on/off setting earlier versions saved (on = <see cref="UiSkin.Modern"/>); read, never written.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public bool ModernUi { get; set; }
 
     public Dictionary<GameAction, List<Keys>> Keys { get; set; } = DefaultKeys();
     /// <summary>The gamepad's bindings: its buttons, D-pad, triggers and the sticks' directions (<see cref="Controls.PadButtons"/>).</summary>
@@ -149,11 +140,10 @@ public sealed class Settings
 
     public static Settings Load(bool persistent)
     {
-        if (!persistent)   // scripted runs: BREEZY_SKIN=original|modern|gilded (or the older BREEZY_MODERN=1), BREEZY_UIFONT, BREEZY_LANGUAGE, BREEZY_SAVESCREEN, BREEZY_COMBATBGM=off, BREEZY_AUTOENDTURN=on, BREEZY_WEAKNESS=on|colorblind, BREEZY_BATTLESCENES=on|playerunits|simple, BREEZY_FFSKIPSCENES=on, BREEZY_UNITSPEED=1|2|4, BREEZY_SKIPENEMY=on
+        if (!persistent)   // scripted runs: BREEZY_SKIN=original|modern|gilded, BREEZY_UIFONT, BREEZY_LANGUAGE, BREEZY_SAVESCREEN, BREEZY_COMBATBGM=off, BREEZY_AUTOENDTURN=on, BREEZY_WEAKNESS=on|colorblind, BREEZY_BATTLESCENES=on|playerunits|simple, BREEZY_FFSKIPSCENES=on, BREEZY_UNITSPEED=1|2|4, BREEZY_SKIPENEMY=on
             return new Settings
             {
-                Skin = Enum.TryParse<UiSkin>(Environment.GetEnvironmentVariable("BREEZY_SKIN"), true, out var skin) ? skin
-                    : Environment.GetEnvironmentVariable("BREEZY_MODERN") == "1" ? UiSkin.Modern : UiSkin.Original,
+                Skin = Enum.TryParse<UiSkin>(Environment.GetEnvironmentVariable("BREEZY_SKIN"), true, out var skin) ? skin : UiSkin.Original,
                 Font = Enum.TryParse<UiFont>(Environment.GetEnvironmentVariable("BREEZY_UIFONT"), true, out var font) ? font : UiFont.NotoSerif,
                 Language = Enum.TryParse<UiLanguage>(Environment.GetEnvironmentVariable("BREEZY_LANGUAGE"), true, out var lang) ? lang : UiLanguage.English,
                 SaveScreen = Enum.TryParse<SaveScreen>(Environment.GetEnvironmentVariable("BREEZY_SAVESCREEN"), true, out var saves) ? saves : SaveScreen.Extended,
@@ -168,26 +158,15 @@ public sealed class Settings
                 ActionMenuFromTop = true,
                 ConfirmSound = ConfirmSound.On,
             };
-        // the earlier names' settings carry over only into a first start (no BreezySRPG95 folder yet): one deleted to
-        // start afresh brings back the defaults, not those
-        bool firstStart = !Directory.Exists(System.IO.Path.GetDirectoryName(UserSettings));
-        foreach (var path in Candidates().Where(p => firstStart || !OldSettings.Contains(p)))
+        foreach (var path in Candidates())
         {
             if (!File.Exists(path)) continue;
             try
             {
                 var s = JsonSerializer.Deserialize<Settings>(File.ReadAllText(path), Json) ?? new Settings();
-                // Space moved from Confirm to the cutscene skip when that was added
-                if (!s.Keys.ContainsKey(GameAction.SkipCutscene) && s.Keys.TryGetValue(GameAction.Confirm, out var ok))
-                    ok.Remove(Microsoft.Xna.Framework.Input.Keys.Space);
                 foreach (var (a, keys) in DefaultKeys()) s.Keys.TryAdd(a, keys);   // actions added later
                 foreach (var (a, buttons) in DefaultPad()) s.Pad.TryAdd(a, buttons);
-                if (s.ModernUi) { s.Skin = UiSkin.Modern; s.ModernUi = false; }   // the old on/off look setting
-                if (s.MessageSound == false) s.ConfirmSound = ConfirmSound.Off;      // the old on/off confirm sound
-                s.MessageSound = null;
-                if (s.BattleScenes == false) s.BattleSceneMode = BattleSceneMode.Simple;   // the old on/off battle scenes
-                s.BattleScenes = null;
-                s.Path = OldSettings.Contains(path) ? UserSettings : path;   // saved to the new place from now on
+                s.Path = path;
                 return s;
             }
             catch (Exception) { /* unreadable: fall back to defaults */ }
@@ -198,25 +177,17 @@ public sealed class Settings
     /// <summary>Where settings live: the user's AppData, shared by every game the client is dropped into.</summary>
     static string UserSettings => System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "BreezySRPG95", "settings.json");
 
-    /// <summary>
-    /// Read in this order: a settings.json next to the executable (a portable setup that keeps its own), the user's,
-    /// then the ones from the client's earlier names (EasySRPG95, and Erumani before it).
-    /// </summary>
+    /// <summary>Read in this order: a settings.json next to the executable (a portable setup that keeps its own), then the user's.</summary>
     static IEnumerable<string> Candidates()
     {
         yield return System.IO.Path.Combine(AppContext.BaseDirectory, "settings.json");
         yield return UserSettings;
-        foreach (var old in OldSettings) yield return old;
     }
-
-    static string[] OldSettings => new[] { "EasySRPG95", "Erumani" }
-        .Select(name => System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), name, "settings.json")).ToArray();
 
     public void Save()
     {
         if (Path is null) return;
-        // never back into an earlier name's folder
-        foreach (var path in new[] { Path }.Concat(Candidates()).Distinct().Where(p => !OldSettings.Contains(p)))
+        foreach (var path in new[] { Path }.Concat(Candidates()).Distinct())
         {
             try
             {
