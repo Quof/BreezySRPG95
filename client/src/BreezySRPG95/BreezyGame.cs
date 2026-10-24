@@ -794,6 +794,13 @@ public sealed class BreezyGame : Game
         // "ffhold" / "ffrelease": the fast-forward key held or let go, at once; "msg": waits until an event shows a message or a choice
         if (_script.TryPeek(out sk) && sk is "ffhold" or "ffrelease") { _script.Dequeue(); _scriptFf = sk == "ffhold"; Trace($"{_frame}: {sk}"); }
         if (_script.TryPeek(out sk) && sk == "msg" && _runner is { Message: not null } or { Choice: not null }) { _script.Dequeue(); Trace($"{_frame}: msg ({_runner?.Name})"); }
+        // "msgbacklog": the backlog opened over the message shown, once the --advance confirms are done
+        if (_script.TryPeek(out sk) && sk == "msgbacklog" && _shotAdvance <= 0 && _runner is { Message: not null })
+        {
+            _script.Dequeue();
+            _backlog.Scroll(1);
+            Trace($"{_frame}: backlog over a message ({_runner.Name})");
+        }
         if (_script.TryPeek(out sk) && sk is "rclick" or "rclickfx" && EventShowing && _options is null && _eventMenu is null && _shotAdvance <= 0 && !bi.Confirm
             && !_fx.Holding && _afterFade is null   // a right click then does nothing (a load's hold, a fade)
             && (sk == "rclick" ? _runner is { Message: not null } or { Choice: not null } : _runner is { Message: null, Choice: null }))
@@ -1432,8 +1439,12 @@ public sealed class BreezyGame : Game
             return;
         }
         _battle?.DrawUi(_sb, view, _frame);
-        DrawMessage();
-        DrawChoice();
+        // the backlog over a message hides it (its face and window), which would show through the list
+        if (!_backlog.Open)
+        {
+            DrawMessage();
+            DrawChoice();
+        }
         // an erase wiping its colour in: the new screen is all that colour (palette entry 0 / 255)
         if (_fx.Fill is { } fill) _ui.Fill(_sb, new Rectangle(0, 0, VirtualWidth, VirtualHeight), fill);
         DrawWipe();
