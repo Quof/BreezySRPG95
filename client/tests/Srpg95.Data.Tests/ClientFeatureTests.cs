@@ -186,6 +186,30 @@ public class ClientFeatureTests
     }
 
     [Fact]
+    public void Nametag_detection_follows_its_patterns()
+    {
+        string? Name(params string[] lines) => BreezySRPG95.Ui.Ui.SplitSpeaker(lines).Name;
+        try
+        {
+            Assert.Equal("ジュナ", Name("ジュナ：", "…"));
+            Assert.Equal("Juna", Name("Juna:", "…"));
+            Assert.Null(Name("【ジュナ】", "…"));
+            BreezySRPG95.Ui.Ui.NameTags = "【*】 ＊「";
+            Assert.Equal("ジュナ", Name("【ジュナ】", "…"));
+            Assert.Equal("ジュナ", Name("ジュナ「", "…"));
+            Assert.Null(Name("ジュナ：", "…"));
+            Assert.Null(Name("【】", "…"));
+            Assert.Null(Name("【勝利条件】", "…"));
+            BreezySRPG95.Ui.Ui.NameTags = "：";   // no * : what the line ends with
+            Assert.Equal("ジュナ", Name("ジュナ：", "…"));
+            BreezySRPG95.Ui.Ui.NameTags = "";
+            Assert.Null(Name("ジュナ：", "…"));
+            Assert.Equal(2, BreezySRPG95.Ui.Ui.SplitSpeaker(new[] { "ジュナ：", "…" }).Text.Count);
+        }
+        finally { BreezySRPG95.Ui.Ui.NameTags = BreezySRPG95.Config.Settings.DefaultNameTags; }
+    }
+
+    [Fact]
     public void Battle_saves_keep_the_camera()
     {
         var test = Folder("えるまに - Save testplay");

@@ -62,6 +62,8 @@ public sealed class BreezyGame : Game
     Controls _controls = null!;
     Ui.OptionsScreen? _options;
     Ui.Backlog _backlog = null!;
+    /// <summary>Text typed since the last update (the window's text input, the input method's too), for a text box in the options.</summary>
+    readonly System.Text.StringBuilder _typed = new();
     bool _ffToggle;
     /// <summary>The enemy ranges key's toggle, kept from map to map.</summary>
     bool _showThreat;
@@ -95,6 +97,7 @@ public sealed class BreezyGame : Game
         };
         IsMouseVisible = false;   // the SYSTEM.BMP cursor is drawn instead
         Window.AllowUserResizing = true;
+        Window.TextInput += (_, e) => { if (!char.IsControl(e.Character)) _typed.Append(e.Character); };
         IsFixedTimeStep = true;
         // two frames per game tick: 33 ms at start-up, 30 ms on maps and camps (GameClock)
         TargetElapsedTime = TimeSpan.FromMilliseconds(GameClock.FrameMs);
@@ -427,6 +430,8 @@ public sealed class BreezyGame : Game
         }
         Ui.Ui.Skin = _settings.Skin;
         Ui.Ui.Font = _settings.Font;
+        Ui.Ui.NameTags = _settings.NameTags;
+        Ui.Backlog.HideNames = _settings.BacklogHidesNames;
         Ui.Lang.Japanese = _settings.Language == UiLanguage.Japanese;
     }
 
@@ -453,6 +458,7 @@ public sealed class BreezyGame : Game
     {
         _prevKeys = k;
         _prevMouse = m;
+        _typed.Clear();
         base.Update(gameTime);
     }
 
@@ -541,7 +547,8 @@ public sealed class BreezyGame : Game
         if (_debug && _session is not null && Pressed(Keys.PageUp)) LoadMap((_mapPos + _mapIndices.Length - 1) % _mapIndices.Length);
 
         // keyboard: arrows move the map cursor and menus; WASD scroll the camera, and move in menus too
-        bool menuOpen = _options is not null || _eventMenu is not null || _title is not null || _camp is not null || _runner?.Choice is not null || _battle?.MenuOpen == true;
+        bool menuOpen = _options is not null || _eventMenu is not null || _title is not null || _camp is not null || _runner?.Choice is not null || _battle?.MenuOpen == true
+            || _backlog.Open;
         bool up = _controls.Repeat(GameAction.Up) || (menuOpen && _controls.Repeat(GameAction.CameraUp));
         bool down = _controls.Repeat(GameAction.Down) || (menuOpen && _controls.Repeat(GameAction.CameraDown));
         bool left = _controls.Repeat(GameAction.Left) || (menuOpen && _controls.Repeat(GameAction.CameraLeft));
@@ -630,7 +637,7 @@ public sealed class BreezyGame : Game
         {
             _frame++;
             _audio.Update();
-            _options.Update(battleInput, _mouseVirtual, _controls, mouseHere && leftDown);
+            _options.Update(battleInput, _mouseVirtual, _controls, mouseHere && leftDown, _typed.ToString());
             if (_options.Done) _options = null;
             EndUpdate(gameTime, k, m);
             return;
@@ -681,6 +688,8 @@ public sealed class BreezyGame : Game
             if (_backlog.Open)
             {
                 if (cancel || click) _backlog.Close();
+                else if (up) _backlog.Scroll(1);
+                else if (down) _backlog.Scroll(-1);
                 _frame++;
                 _audio.Update();
                 EndUpdate(gameTime, k, m);
@@ -756,6 +765,7 @@ public sealed class BreezyGame : Game
         EdgeScroll(m, mouseHere);
         _prevKeys = k;
         _prevMouse = m;
+        _typed.Clear();
         base.Update(gameTime);
     }
 

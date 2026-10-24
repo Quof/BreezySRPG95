@@ -252,7 +252,63 @@ public sealed class OptionsScreen
         Gap(),
         Toggle(T("Mouse input", "マウス操作"), () => _s.MouseInput, v => _s.MouseInput = v),
         Toggle(T("Scroll with the pointer at the edge", "画面端にカーソルでスクロール"), () => _s.EdgeScrollHover, v => _s.EdgeScrollHover = v),
+        Gap(),
+        new(T("Nametag detection", "名前欄の判定"), () => _s.NameTags == Settings.DefaultNameTags ? T("Default", "標準")
+            : _s.NameTags.Length == 0 ? T("None", "なし") : _s.NameTags, Activate: OpenNameTags),
+        Toggle(T("Never show nametags in the backlog", "メッセージ履歴に名前を表示しない"), () => _s.BacklogHidesNames, v => _s.BacklogHidesNames = v),
     };
+
+    /// <summary>The Nametag detection box: what it does, the patterns as typed, Default and None under them.</summary>
+    Camp.MenuList? _tags;
+    string _tagText = "";
+
+    void OpenNameTags()
+    {
+        _tagText = _s.NameTags;
+        var header = new[]
+        {
+            T("Nametag detection", "名前欄の判定"), "-",
+            T("When a message's first line matches one of these", "メッセージの1行目がこの形のどれかに合うと、"),
+            T("patterns, it is shown as the speaker's name, in the", "話し手の名前として名前欄（ゴールド・モダン）"),
+            T("name box (Gilded and Modern looks) and the backlog.", "とメッセージ履歴に表示します。"),
+            T("* stands for the name; separate patterns with spaces.", "* が名前の部分です。形はスペースで区切ります。"),
+            T("Type, then Enter. Esc: cancel.", "入力して Enter で決定、Esc で取消。"), "-",
+        };
+        int w = Math.Max(300, header.Max(_ui.Measure12) + 36), h = 16 * (header.Length + 3) + 16;
+        _tags = new Camp.MenuList { Rect = new Rectangle(320 - w / 2, 240 - h / 2, w, h), Header = header, ItemX = 18, ItemWidth = w - 36 };
+        TagItems();
+        _tags.Index = 0;
+        Sfx.Click();
+    }
+
+    void TagItems() => _tags?.Set(new[] { _tagText + "_", $"{T("Default", "標準")}  ({Settings.DefaultNameTags})", T("None", "なし") });
+
+    /// <summary>
+    /// The Nametag detection box's input: what's typed goes into the patterns while their row is chosen (Backspace takes
+    /// a character off); the arrows, Enter and Esc move, choose and cancel (the bound keys would be typed instead), and a
+    /// gamepad's bound buttons do too. Enter on the patterns keeps them; Default and None set theirs.
+    /// </summary>
+    void UpdateNameTags(Camp.MenuList tags, BattleInput i, Point mouse, Controls controls, string typed)
+    {
+        var key = controls.NewKey();
+        var button = controls.NewButton();
+        bool Pad(GameAction a) => button is { } b && (_s.Pad.GetValueOrDefault(a)?.Contains(b) ?? false);
+        if (key == Keys.Escape || i.RightClick || Pad(GameAction.Cancel) || (i.Click && !tags.Rect.Contains(mouse))) { _tags = null; Sfx.Cancel(); return; }
+        if (tags.Index == 0)
+        {
+            _tagText += typed;
+            if (key == Keys.Back && _tagText.Length > 0) _tagText = _tagText[..^1];
+        }
+        TagItems();
+        var nav = new BattleInput(Confirm: key == Keys.Enter || Pad(GameAction.Confirm), Cancel: false, Up: key == Keys.Up || Pad(GameAction.Up),
+            Down: key == Keys.Down || Pad(GameAction.Down), Left: false, Right: false, MouseTile: null, MouseMoved: i.MouseMoved, Click: i.Click,
+            RightClick: false, FastForward: false);
+        int pick = tags.Navigate(nav, mouse);
+        if (pick < 0 || pick == 0 && i.Click) return;   // a click on the patterns only puts the typing there
+        _s.NameTags = pick switch { 0 => string.Join(' ', _tagText.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)), 1 => Settings.DefaultNameTags, _ => "" };
+        _tags = null;
+        Changed();
+    }
 
     static readonly int[] Speeds = { 2, 3, 4, 6, 8 };
     /// <summary>Unit movement speeds: divisors of a step's 16 frames, so every step is whole frames.</summary>
@@ -343,8 +399,10 @@ public sealed class OptionsScreen
     int LevelAt(int x) => Math.Clamp((int)MathF.Round((x - _list.Rect.X - BarX) * 100f / BarW), 0, 100);
 
     /// <param name="held">the left button is down (a bar's drag goes on)</param>
-    public void Update(BattleInput i, Point mouse, Controls controls, bool held = false)
+    /// <param name="typed">text typed since the last update (for the Nametag detection box)</param>
+    public void Update(BattleInput i, Point mouse, Controls controls, bool held = false, string typed = "")
     {
+        if (_tags is { } tags) { UpdateNameTags(tags, i, mouse, controls, typed); return; }
         if (_confirm is { } q)
         {
             if (i.Cancel || i.RightClick) { _confirm = null; Sfx.Cancel(); return; }
@@ -472,6 +530,14 @@ public sealed class OptionsScreen
             if (Ui.Modern) _ui.ModernBox(sb, drop.Rect, new Color(8, 10, 18), 10, 1f, shadow: false);
             else _ui.Fill(sb, drop.Rect, new Color(8, 10, 18));
             drop.Draw(sb, _ui, true, frame);
+        }
+        if (_tags is { } tg)
+        {
+            if (Ui.Modern) _ui.ModernBox(sb, tg.Rect, new Color(8, 10, 18), 10, 1f, shadow: false);
+            else _ui.Fill(sb, tg.Rect, new Color(8, 10, 18));
+            tg.Draw(sb, _ui, true, frame);
+            var field = tg.Row(0);
+            _ui.Fill(sb, new Rectangle(field.X + 4, field.Bottom - 1, field.Width - 8, 1), Ui.PanelText * 0.6f);
         }
         if (_confirm is { } q)
         {

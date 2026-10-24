@@ -364,15 +364,31 @@ public sealed class Ui : IDisposable
         return r;
     }
 
+    static (string Before, string After)[] _nameTags = ParseNameTags(Settings.DefaultNameTags);
+
     /// <summary>
-    /// A message's speaker — its first line when that is just 「name：」, as nearly every message in the game starts — and
-    /// the rest. A label for a condition (勝利条件：, 敗北条件：, ボーナス条件：, 終了条件： …) is written the same way but
-    /// is no one speaking: in all five games every such first line with 条件 in it is one, so it stays in the text.
+    /// The Nametag detection setting: patterns separated by spaces, * (or ＊) standing for the name, e.g. "*： *:" or
+    /// "【*】"; a pattern without one is what the line ends with. Empty: no message has a speaker.
+    /// </summary>
+    public static string NameTags { set => _nameTags = ParseNameTags(value); }
+
+    static (string, string)[] ParseNameTags(string? patterns) => (patterns ?? "").Replace('＊', '*')
+        .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)
+        .Select(p => p.IndexOf('*') is var star and >= 0 ? (p[..star], p[(star + 1)..].Replace("*", "")) : ("", p)).ToArray();
+
+    /// <summary>
+    /// A message's speaker — its first line when that is just 「name：」 (or what <see cref="NameTags"/> says), as nearly
+    /// every message in the game starts — and the rest. A label for a condition (勝利条件：, 敗北条件：, ボーナス条件：,
+    /// 終了条件： …) is written the same way but is no one speaking: in all five games every such first line with 条件 in
+    /// it is one, so it stays in the text.
     /// </summary>
     public static (string? Name, IReadOnlyList<string> Text) SplitSpeaker(IReadOnlyList<string> lines)
     {
-        if (lines.Count > 0 && lines[0].TrimEnd() is { Length: > 1 } first && (first.EndsWith('：') || first.EndsWith(':')) && !first.Contains("条件"))
-            return (first[..^1].Trim(), lines.Skip(1).ToList());
+        if (lines.Count > 0 && lines[0].Trim() is { Length: > 0 } first && !first.Contains("条件"))
+            foreach (var (before, after) in _nameTags)
+                if (first.Length > before.Length + after.Length && first.StartsWith(before, StringComparison.Ordinal) && first.EndsWith(after, StringComparison.Ordinal)
+                    && first[before.Length..^after.Length].Trim() is { Length: > 0 } name)
+                    return (name, lines.Skip(1).ToList());
         return (null, lines);
     }
 

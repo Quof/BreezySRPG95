@@ -52,6 +52,9 @@ public sealed class Settings
     public SaveScreen SaveScreen { get; set; } = SaveScreen.Extended;
 
     /// <summary>The window's size; 1280 × 960 for one too small to be one.</summary>
+    /// <summary>The name lines all five games write: 「名前：」, with a full-width or a plain colon.</summary>
+    public const string DefaultNameTags = "*： *:";
+
     [JsonIgnore] public (int Width, int Height) WindowSize => WindowWidth >= 320 && WindowHeight >= 240 ? (WindowWidth, WindowHeight) : (1280, 960);
 
     // audio
@@ -73,6 +76,8 @@ public sealed class Settings
     public bool FastForwardMouse { get; set; } = true;    // holding the left mouse button or the confirm key fast-forwards (after 0.4 s; 1 s in a cutscene)
     public bool MouseInput { get; set; } = true;          // off: the mouse does nothing (keyboard only)
     public bool EdgeScrollHover { get; set; } = true;     // the pointer on the screen frame scrolls the map, no button held
+    public string NameTags { get; set; } = DefaultNameTags;   // what a message's first line must look like to be its speaker's name (Ui.NameTags); "" none
+    public bool BacklogHidesNames { get; set; }           // the backlog leaves out the speaker's name line
     public WeaknessOrbs WeaknessOrbs { get; set; }       // the class's attribute weaknesses as orbs on the status window's portrait
     public int UnitSpeed { get; set; } = 2;               // units walk on the battle map at this many times the original's pace
     public bool AutoEndTurn { get; set; }                 // the turn ends by itself once every unit of the player's has acted

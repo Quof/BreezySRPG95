@@ -7,11 +7,12 @@ namespace BreezySRPG95.Ui;
 /// <summary>
 /// Text backlog (modern): every message shown since the title, newest at the bottom, over the dimmed screen. Mouse wheel
 /// up (or the backlog key) opens it and scrolls back a message at a time; wheel down scrolls forward and closes it past
-/// the newest; Cancel or a click closes it. A spoken message shows the face it was spoken with (flipped as it was), half
-/// size in a thin white frame, its text beside it (the speaker's 「名前：」 line left out: the face says who); narration has
-/// no frame, its text in the same column. A message is as tall as its frame or its text, so a long one pushes the next
-/// down. The list starts where five framed messages stand centred on the screen, and runs down from there: a longer
-/// message pushes the bottom down, towards the screen's edge.
+/// the newest; Up / Down (keys or pad) do the same; Cancel or a click closes it. A spoken message shows the face it was
+/// spoken with (flipped as it was), half size in a thin white frame, its text beside it, the top of its letters level
+/// with the frame's top; narration has no frame, its text in the same column. The speaker's 「名前：」 line is its first,
+/// the name alone in gold (left out with <see cref="HideNames"/>). A message is as tall as its frame or its text, so a
+/// long one pushes the next down. The list starts where five framed messages stand centred on the screen, and runs down
+/// from there: a longer message pushes the bottom down, towards the screen's edge.
 /// </summary>
 public sealed class Backlog(Ui ui)
 {
@@ -21,9 +22,11 @@ public sealed class Backlog(Ui ui)
     readonly List<Entry> _entries = new();
     int _scroll;   // messages scrolled up from the newest
     public bool Open { get; private set; }
+    /// <summary>The "never show nametags in the backlog" option.</summary>
+    public static bool HideNames { get; set; }
 
     const int FrameX = 22, FaceSize = 64;      // the face at half its 128 px: whole pixels at a render scale of 2 and up
-    const int TextX = FrameX + FaceSize + 2 + 16, Gap = 16, TextTop = 2;
+    const int TextX = FrameX + FaceSize + 2 + 16, Gap = 16, InkY = 2;   // a framed message's letters from 2 px under the frame's top
     // the list's room on the 640 × 480 screen: from where five framed messages are centred, down to near the bottom
     const int Top = (480 - (5 * (FaceSize + 2) + 4 * Gap)) / 2, Bottom = 466;
 
@@ -35,16 +38,44 @@ public sealed class Backlog(Ui ui)
 
     public void Clear() { _entries.Clear(); Open = false; }
 
-    /// <summary>The lines shown: a spoken message's without its 「名前：」 line (its face stands for the name).</summary>
-    IReadOnlyList<string> Text(Entry e) => e.Face > 0 && ui.Face(e.Face) is not null ? Ui.SplitSpeaker(e.Lines).Text : e.Lines;
+    /// <summary>The speaker's name (null: none, or <see cref="HideNames"/>) and the lines under it.</summary>
+    static (string? Name, IReadOnlyList<string> Text) Shown(Entry e)
+    {
+        var (name, text) = Ui.SplitSpeaker(e.Lines);
+        return name is null || HideNames ? (null, text) : (name, text);
+    }
+
+    static int LineCount(Entry e) { var (name, text) = Shown(e); return text.Count + (name is null ? 0 : 1); }
 
     bool Framed(Entry e) => e.Face > 0 && ui.Face(e.Face) is not null;
 
     /// <summary>A message's height: its frame's or its text's, the taller.</summary>
     int Height(Entry e)
     {
-        int text = Math.Max(1, Text(e).Count) * Ui.LineHeight;
-        return Framed(e) ? Math.Max(FaceSize + 2, TextTop + text) : text;
+        int text = Math.Max(1, LineCount(e)) * Ui.LineHeight;
+        return Framed(e) ? Math.Max(FaceSize + 2, TextTop() + text) : text;
+    }
+
+    float _ink;
+    string? _inkKey;
+
+    /// <summary>
+    /// Where a framed message's first line is drawn below the frame's top: so that the letters' tops, wherever the font
+    /// puts them in its line, come <see cref="InkY"/> px under it. The font's ink top is read off a rendered line once.
+    /// </summary>
+    int TextTop()
+    {
+        if (ui.Text.Get("国あ") is not { } t) return InkY;
+        string key = $"{Ui.Skin}/{Ui.Font}/{ui.Text.FaceName}/{ui.Text.Height}/{t.Scale}/{t.Lift}/{t.Texture.Width}x{t.Texture.Height}";
+        if (key != _inkKey)
+        {
+            var px = new Color[t.Texture.Width * t.Texture.Height];
+            t.Texture.GetData(px);
+            int first = Array.FindIndex(px, c => c.A > 64);
+            _ink = first < 0 ? 0 : first / t.Texture.Width / (float)t.Scale - t.Lift;
+            _inkKey = key;
+        }
+        return (int)MathF.Round(InkY - _ink);
     }
 
     /// <summary>How many of the newest messages can be scrolled past while older ones still fill the screen.</summary>
@@ -100,9 +131,11 @@ public sealed class Backlog(Ui ui)
                 sb.Draw(face, new Rectangle(FrameX + 1, y + 1, FaceSize, FaceSize), null, Color.White, 0, Vector2.Zero,
                     e.Flip ? SpriteEffects.FlipHorizontally : SpriteEffects.None, 0);
             }
-            var text = Text(e);
+            var (name, text) = Shown(e);
+            int ty = y + (Framed(e) ? TextTop() : 0);
+            if (name is not null) { ui.ShadowText(sb, ui.Text, name, new Vector2(TextX, ty), Ui.GoldLight); ty += Ui.LineHeight; }
             for (int k = 0; k < text.Count; k++)
-                ui.ShadowText(sb, ui.Text, text[k], new Vector2(TextX, y + (Framed(e) ? TextTop : 0) + k * Ui.LineHeight), ink);
+                ui.ShadowText(sb, ui.Text, text[k], new Vector2(TextX, ty + k * Ui.LineHeight), ink);
             y += h + Gap;
         }
         // small white marks where there is more: older messages above, newer below
