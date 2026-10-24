@@ -270,11 +270,11 @@ public sealed class OptionsScreen
             T("Nametag Detection", "名前欄の判定"), "-",
             T("Names are identified and shown in the nametag box used in", "名前は次の検索パターンで判定され、オリジナル以外の"),
             T("the alternative guis by the following search patterns.", "インターフェースの名前欄に表示されます。"),
-            T("* = Name", "* ＝ 名前"), T("Space = different patterns.", "スペース ＝ 別のパターン"),
+            T("* = Name", "* ＝ 名前"), T("| = line break.", "| ＝ 改行"), T("Space = different patterns.", "スペース ＝ 別のパターン"),
             T("So *: identifies \"Rutee:\" as a name and puts it in the", "例　　*： は「ルーティ：」を名前と判定し、"),
             T("nametag box.", "名前欄に表示します。"),
-            T("| = line break. So *|「 catches a name alone on the line", "| ＝ 改行。例　　*|「 は「で始まる行の上の、"),
-            T("above one starting with 「.", "名前だけの行を判定します。"),
+            T("So *|「 catches a name alone on the line above one", "例　　*|「 は「で始まる行の上の、"),
+            T("starting with 「.", "名前だけの行を判定します。"),
             T("To add more, type them then press enter. ESC to cancel.", "追加するには入力して Enter、Esc で取消。"), "-",
         };
         int w = Math.Max(300, header.Max(_ui.Measure12) + 36), h = 16 * (header.Length + 3) + 16;
