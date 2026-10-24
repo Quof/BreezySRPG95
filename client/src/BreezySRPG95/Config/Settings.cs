@@ -89,6 +89,8 @@ public sealed class Settings
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public bool ModernUi { get; set; }
 
     public Dictionary<GameAction, List<Keys>> Keys { get; set; } = DefaultKeys();
+    /// <summary>The gamepad's bindings: its buttons, D-pad, triggers and the sticks' directions (<see cref="Controls.PadButtons"/>).</summary>
+    public Dictionary<GameAction, List<Buttons>> Pad { get; set; } = DefaultPad();
 
     /// <summary>Keyboard layout in the spirit of SRPG Studio: arrows move the map cursor and menus, WASD scroll the
     /// camera (and move in menus), Enter/Z confirm, Esc/X/Backspace cancel, Space skips a cutscene.</summary>
@@ -111,6 +113,34 @@ public sealed class Settings
         [GameAction.Fullscreen] = new() { Microsoft.Xna.Framework.Input.Keys.F4 },
         [GameAction.SkipCutscene] = new() { Microsoft.Xna.Framework.Input.Keys.Space },
         [GameAction.EnemyRanges] = new() { Microsoft.Xna.Framework.Input.Keys.R },
+    };
+
+    /// <summary>
+    /// The gamepad as SRPG Studio has it, read as an Xbox pad's buttons in their usual order (its game.ini numbers them:
+    /// SELECT 5, CANCEL 6, OPTION 7, OPTION2 8, L_SWITCH 9, R_SWITCH 10, SYSTEM 11, SKIP 12 — the D-pad's four first):
+    /// A confirms, B cancels, X shows the unit (OPTION, its C key), Y the options (OPTION2), View fast-forwards (SYSTEM),
+    /// Menu skips a cutscene (SKIP); the bumpers, its unit switch, are the backlog and the enemy ranges here. The D-pad and
+    /// the left stick move the cursor, the right stick the camera.
+    /// </summary>
+    public static Dictionary<GameAction, List<Buttons>> DefaultPad() => new()
+    {
+        [GameAction.Confirm] = new() { Buttons.A },
+        [GameAction.Cancel] = new() { Buttons.B },
+        [GameAction.Info] = new() { Buttons.X },
+        [GameAction.Up] = new() { Buttons.DPadUp, Buttons.LeftThumbstickUp },
+        [GameAction.Down] = new() { Buttons.DPadDown, Buttons.LeftThumbstickDown },
+        [GameAction.Left] = new() { Buttons.DPadLeft, Buttons.LeftThumbstickLeft },
+        [GameAction.Right] = new() { Buttons.DPadRight, Buttons.LeftThumbstickRight },
+        [GameAction.CameraUp] = new() { Buttons.RightThumbstickUp },
+        [GameAction.CameraDown] = new() { Buttons.RightThumbstickDown },
+        [GameAction.CameraLeft] = new() { Buttons.RightThumbstickLeft },
+        [GameAction.CameraRight] = new() { Buttons.RightThumbstickRight },
+        [GameAction.FastForward] = new() { Buttons.Back },
+        [GameAction.Backlog] = new() { Buttons.LeftShoulder },
+        [GameAction.Options] = new() { Buttons.Y },
+        [GameAction.Fullscreen] = new(),
+        [GameAction.SkipCutscene] = new() { Buttons.Start },
+        [GameAction.EnemyRanges] = new() { Buttons.RightShoulder },
     };
 
     static readonly JsonSerializerOptions Json = new() { WriteIndented = true, Converters = { new JsonStringEnumConverter() } };
@@ -148,6 +178,7 @@ public sealed class Settings
                 if (!s.Keys.ContainsKey(GameAction.SkipCutscene) && s.Keys.TryGetValue(GameAction.Confirm, out var ok))
                     ok.Remove(Microsoft.Xna.Framework.Input.Keys.Space);
                 foreach (var (a, keys) in DefaultKeys()) s.Keys.TryAdd(a, keys);   // actions added later
+                foreach (var (a, buttons) in DefaultPad()) s.Pad.TryAdd(a, buttons);
                 if (s.ModernUi) { s.Skin = UiSkin.Modern; s.ModernUi = false; }   // the old on/off look setting
                 if (s.MessageSound == false) s.ConfirmSound = ConfirmSound.Off;      // the old on/off confirm sound
                 s.MessageSound = null;

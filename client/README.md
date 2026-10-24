@@ -113,7 +113,9 @@ The project, its folder (`src/BreezySRPG95`) and its namespace are all called Br
 
 ## Controls
 
-Default keys (SRPG Studio style); all can be rebound under Options → Controls.
+Default keys (SRPG Studio style); all can be rebound under Options → Controls → Keyboard.
+
+A gamepad works too (the first one connected: Xbox, PlayStation and most others, through SDL), rebound under Options → Controls → Gamepad, which names the controller and shows its buttons as pictures (an Xbox or a PlayStation pad's, by its name; `Ui/PadGlyphs.cs`, from DT3's `sKeyPressPad`). By default, as SRPG Studio numbers its pad: A confirm, B cancel, X unit status, Y options, View fast-forward, Menu skip the cutscene, LB the backlog, RB enemy ranges, the D-pad and the left stick the cursor, the right stick the camera.
 
 | Keys | Action |
 |---|---|
@@ -142,7 +144,7 @@ F1 opens them anywhere; the title screen, the camp menu and a map's turn menu li
 | Display | interface style (original / gilded / modern); font of the modern and gilded styles (listed as MS Gothic — the face the original draws its messages in —, the pixel fonts DotGothic16 with PixelMplus12 and the KH Dot font, then Noto Serif JP, the default, Noto Sans JP, BIZ UDPGothic and Yu Gothic UI); language of BreezySRPG95's own menus and messages (日本語 by default, or English — the game's text is the game's); window size (4:3 sizes that fit the screen, whole multiples marked, then fullscreen, borderless); scaling (pixel-perfect whole multiples / fit 4:3 / stretch); filter (sharp / smooth); save / load screen (extended: 100 files / original: 8) |
 | Audio | BGM and SE volume (bars: click or drag along them, ← / → or the wheel in steps of 10), loop at loop markers (off at first; see below), MIDI playback (SoundFont via MeltySynth, or Windows MIDI like the original), SoundFont file, combat BGM (off: a fight plays the turn's own music, which goes on uninterrupted; music an event put on still ends with the next fight, as the original's battle music ends it), confirm sound (the CLICK "thunk": on, gameplay only — everywhere but clicking a message away; the default — or off; saving and loading play it even when it's off) |
 | Gameplay | unit movement speed on the battle map (×1 the original's, ×2 at first, ×4; event moves keep the original pace), weakness orbs on the unit status portrait (off, on, or colour-blind with the attribute's letter: A red, B yellow, C green, D blue, E white, F black, A at the top), end the turn by itself once every unit of yours has acted (off at first), battle animations (戦闘演出): on, player units only (allies, guests and neutral units: an enemy's attack or spell shows just its result) or simple (results only), skip enemy turn, fast-forward key (hold / toggle), mouse input (off: keyboard only — no clicks, wheel, pointer or hover; F1 still opens the options), hold left click or the confirm key to fast-forward (after 0.4 s in battle, 1 s in a cutscene, so a slow click on a message doesn't skip the next; a press still confirms), scroll with the pointer at the edge (on the screen frame; only when the original lets a held click scroll there), action menu starts on 行動終了 (the original's, and the default) or its first entry, speed (×2–×8, ×2 at first), fast-forward skips battle scenes (off at first), fast-forward advances text |
-| Controls | rebind every action; reset to defaults |
+| Controls | keyboard or gamepad: rebind every action (a key or button added, or taken off if it was there); reset to defaults |
 
 The frame is drawn at the window's resolution: the pixel art is scaled up whole, and the modern and gilded styles' text and gold are drawn at the window's own pixels, so they stay crisp at any size. The filter only matters when the window isn't a whole multiple of 640×480.
 

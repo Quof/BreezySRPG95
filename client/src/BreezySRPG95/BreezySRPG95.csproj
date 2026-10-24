@@ -105,6 +105,8 @@
   <ItemGroup>
     <EmbeddedResource Include="Icon.ico" LogicalName="Icon.ico" />
     <EmbeddedResource Include="Icon.bmp" LogicalName="Icon.bmp" />
+    <!-- gamepad buttons, 9 × 8 each, from DT3's sKeyPressPad (Ui/PadGlyphs.cs) -->
+    <EmbeddedResource Include="pad\PadGlyphs.png" LogicalName="pad/PadGlyphs.png" />
   </ItemGroup>
 
   <!--

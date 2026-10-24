@@ -82,6 +82,7 @@ public sealed class Ui : IDisposable
         Text = TextFonts.Create(device);
         SmallText = TextFonts.Create(device, 12, 400, "BREEZY_SMALLFONT");
         NameText = TextFonts.Create(device, 16, 700, "BREEZY_FONT");
+        Pad = new PadGlyphs(device);
         BoldText = TextFonts.Create(device, 14, 700, "BREEZY_BOLDFONT");
         _pixel = new Texture2D(device, 1, 1);
         _pixel.SetData(new[] { Color.White });
@@ -123,6 +124,9 @@ public sealed class Ui : IDisposable
 
     /// <summary>The original's 12-px font, read from SRPGEXEC.EXE (null when it can't be).</summary>
     public ExeFont? MenuFont { get; set; }
+
+    /// <summary>Gamepad buttons as pictures (the options' gamepad page).</summary>
+    public PadGlyphs Pad { get; }
 
     /// <summary>
     /// The original's 12-px text (FUN_00407744) at GDI position (x, y): the exe's own font; with a restyled skin or no exe,

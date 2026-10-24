@@ -476,7 +476,7 @@ public sealed class BreezyGame : Game
         }
         bool keyFuzz = _frame < _keyFuzzUntil;
         if (keyFuzz) (k, m) = KeyFuzz(m);
-        _controls.Update(k);
+        _controls.Update(k, _opts.Screenshot is null && IsActive && Controls.PadIndex() is var pad and >= 0 ? GamePad.GetState(pad) : default);
         // play time (BreezySRPG95's own count): while a game is on, a map or a camp, and the window is in front
         if (IsActive && _logo < 0 && _title is null && _gameOver < 0 && (_session is not null || _camp is not null))
             _state.PlaySeconds += gameTime.ElapsedGameTime.TotalSeconds;

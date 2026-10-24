@@ -2,6 +2,7 @@ using BreezySRPG95.Config;
 using BreezySRPG95.Runtime;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using Microsoft.Xna.Framework.Input;
 using static BreezySRPG95.Ui.Lang;
 
 namespace BreezySRPG95.Ui;
@@ -21,10 +22,11 @@ public sealed class OptionsScreen
     /// (<see cref="Choices"/>, the current one <see cref="Chosen"/>) for the drop-down, which sets one with <see cref="Pick"/>;
     /// <see cref="Activate"/> opens a page or runs a command. <see cref="Wheel"/>: the wheel steps it too (a volume).
     /// <see cref="Level"/> / <see cref="SetLevel"/>: a 0–100 bar in the value column that a click sets and a drag slides.
+    /// <see cref="Pad"/>: gamepad buttons shown as pictures in the value column.
     /// </summary>
     sealed record Row(string Label, Func<string> Value, Action<int>? Change = null, Action? Activate = null,
         Func<string[]>? Choices = null, Func<int>? Chosen = null, Action<int>? Pick = null, bool Wheel = false,
-        Func<int>? Level = null, Action<int>? SetLevel = null);
+        Func<int>? Level = null, Action<int>? SetLevel = null, Func<IReadOnlyList<Buttons>>? Pad = null);
 
     static Row Choice(string label, Func<string[]> names, Func<int> chosen, Action<int> pick) =>
         new(label, () => names().ElementAtOrDefault(chosen()) ?? "",
@@ -33,7 +35,15 @@ public sealed class OptionsScreen
 
     static Row Toggle(string label, Func<bool> get, Action<bool> set) => new(label, () => OnOff(get()), _ => set(!get()));
 
-    enum Page { Main, Display, Audio, Gameplay, Controls }
+    enum Page { Main, Display, Audio, Gameplay, Controls, Keyboard, Gamepad }
+
+    /// <summary>The page Back leads to, and the row it opens on there.</summary>
+    static (Page Page, int Row) Parent(Page p) => p switch
+    {
+        Page.Keyboard => (Page.Controls, 0),
+        Page.Gamepad => (Page.Controls, 1),
+        _ => (Page.Main, 0),
+    };
 
     readonly Settings _s;
     readonly Ui _ui;
@@ -43,7 +53,7 @@ public sealed class OptionsScreen
     List<Row> _rows = new();
     Page _page;
     int _mainIndex;
-    GameAction? _waiting;
+    GameAction? _waiting, _waitingPad;
     /// <summary>The open drop-down list and the row it belongs to.</summary>
     Camp.MenuList? _drop;
     int _dropRow;
@@ -84,7 +94,13 @@ public sealed class OptionsScreen
             Page.Display => DisplayRows(),
             Page.Audio => AudioRows(),
             Page.Gameplay => GameplayRows(),
-            Page.Controls => ControlRows(),
+            Page.Controls => new List<Row>
+            {
+                new(T("Keyboard", "キーボード"), () => "", Activate: () => Open(Page.Keyboard)),
+                new(T("Gamepad", "ゲームパッド"), () => "", Activate: () => Open(Page.Gamepad)),
+            },
+            Page.Keyboard => ControlRows(),
+            Page.Gamepad => PadRows(),
             _ => new List<Row>
             {
                 new(T("Display", "画面"), () => "", Activate: () => Open(Page.Display)),
@@ -103,7 +119,8 @@ public sealed class OptionsScreen
                     Activate: () => Ask(T("Close the game?", "ゲームを終了しますか？"), quit)));
             _rows.Add(new(T("Back", "戻る"), () => "", Activate: () => Done = true));
         }
-        if (page != Page.Main) _rows.AddRange(new[] { new Row("", () => ""), new Row(T("Back", "戻る"), () => "", Activate: () => Open(Page.Main)) });
+        if (page != Page.Main)
+            _rows.AddRange(new[] { new Row("", () => ""), new Row(T("Back", "戻る"), () => "", Activate: () => Open(Parent(page).Page, Parent(page).Row)) });
         _list.Index = page == Page.Main && index == 0 ? _mainIndex : index;
         Refresh();
     }
@@ -111,7 +128,8 @@ public sealed class OptionsScreen
     string PageTitle => _page switch
     {
         Page.Display => T("Display", "画面"), Page.Audio => T("Audio", "サウンド"), Page.Gameplay => T("Gameplay", "ゲーム"),
-        Page.Controls => T("Controls", "操作"), _ => T("Options", "環境設定"),
+        Page.Controls => T("Controls", "操作"), Page.Keyboard => T("Controls: keyboard", "操作：キーボード"),
+        Page.Gamepad => T("Controls: gamepad", "操作：ゲームパッド"), _ => T("Options", "環境設定"),
     };
 
     /// <summary>Window sizes to offer: 4:3 sizes the screen can hold (640 × 480 always), the whole multiples marked.</summary>
@@ -267,6 +285,26 @@ public sealed class OptionsScreen
         return rows;
     }
 
+    /// <summary>
+    /// The gamepad's page: the controller found (its buttons drawn as an Xbox or a PlayStation pad's), then each action's
+    /// buttons as pictures; choosing one waits for a button, which is added, or taken off if it was there.
+    /// </summary>
+    List<Row> PadRows()
+    {
+        var rows = new List<Row>
+        {
+            new(T("Controller", "コントローラー"), () => Controls.PadName() ?? T("none connected", "接続されていません")),
+            new("", () => ""),
+        };
+        rows.AddRange(Enum.GetValues<GameAction>().Select(a => new Row(ActionName(a),
+            () => _waitingPad == a ? T("press a button… (right click: cancel)", "ボタンを押してください…（右クリックで取消）") : "",
+            Activate: () => _waitingPad = a,
+            Pad: () => _waitingPad == a ? Array.Empty<Buttons>() : _s.Pad.GetValueOrDefault(a) ?? new())));
+        rows.Add(new Row("", () => ""));
+        rows.Add(new Row(T("Reset to defaults", "初期設定に戻す"), () => "", Activate: () => { _s.Pad = Settings.DefaultPad(); Changed(); }));
+        return rows;
+    }
+
     void Refresh()
     {
         _list.Set(_rows.Select(r => r.Label).ToArray(), _rows.Select(r => r.Change is not null || r.Activate is not null).ToArray());
@@ -329,6 +367,20 @@ public sealed class OptionsScreen
             Changed();
             return;
         }
+        if (_waitingPad is { } pa)
+        {
+            if (i.RightClick || controls.NewKey() == Keys.Escape) { _waitingPad = null; Refresh(); return; }
+            if (controls.NewButton() is { } button)
+            {
+                var list = _s.Pad.GetValueOrDefault(pa) ?? new();
+                if (!list.Remove(button)) list.Add(button);
+                _s.Pad[pa] = list;
+                _waitingPad = null;
+                Changed();
+            }
+            else Refresh();   // the controller's name, should one be plugged in meanwhile
+            return;
+        }
         if (_waiting is { } a)
         {
             if (i.RightClick) { _waiting = null; Refresh(); return; }
@@ -352,7 +404,7 @@ public sealed class OptionsScreen
             Changed();
             return;
         }
-        if (i.Cancel || i.RightClick) { if (_page != Page.Main) Open(Page.Main); else Done = true; Sfx.Cancel(); return; }
+        if (i.Cancel || i.RightClick) { if (_page != Page.Main) Open(Parent(_page).Page, Parent(_page).Row); else Done = true; Sfx.Cancel(); return; }
         var row = _rows.ElementAtOrDefault(_list.Index);
         if ((i.Left || i.Right) && row?.Change is not null) { row.Change(i.Right ? 1 : -1); Sfx.Click(); Changed(); return; }
         // the wheel over a volume: up louder, down quieter, a step a notch as left / right
@@ -407,6 +459,15 @@ public sealed class OptionsScreen
             _ui.Fill(sb, new Rectangle(kx - 2, cy - 5, 5, 10), k == _dragRow ? Color.White : accent);
             if (_ui.SmallText.Get($"{v}%") is { } pct)
                 pct.Draw(sb, new Vector2(_list.Rect.X + _list.ColumnX[0] - pct.Width, Ui.Line16Y(pct, row.Y)), Ui.PanelText);
+        }
+        // gamepad buttons as pictures, twice their pixels, right-aligned where the values end
+        bool ps = PadGlyphs.PlayStation(_page == Page.Gamepad ? Controls.PadName() : null);
+        for (int k = 0; k < _rows.Count; k++)
+        {
+            if (_rows[k].Pad?.Invoke() is not { Count: > 0 } buttons) continue;
+            var row = _list.Row(k);
+            int w = PadGlyphs.Measure(buttons, ps, 2, 4);
+            _ui.Pad.Draw(sb, buttons, ps, _list.Rect.X + _list.ColumnX[0] - w, row.Y + (row.Height - 2 * PadGlyphs.Height) / 2, 2, 4, Color.White);
         }
         _ui.SmallText.Get(PageTitle)?.Draw(sb, new Vector2(_list.Rect.X + 8, _list.Rect.Y - 16), Ui.Gilded ? Ui.GoldLight : Ui.PanelText);
         if (_drop is { } drop)
