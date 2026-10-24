@@ -46,9 +46,12 @@ public sealed class GdiText : IDisposable
     IntPtr _selected;
     /// <summary>The smooth faces made so far, by font and render scale.</summary>
     readonly Dictionary<(UiFont Font, int Scale), Smooth> _smooth = new();
-    /// <summary>Rendered strings, all in one mode: the bitmap font, or one smooth face at one scale (64 MB of them at most).</summary>
+    /// <summary>
+    /// Rendered strings, all in one mode: the bitmap font, or one restyled face at one scale (64 MB of them at most). The
+    /// look is part of the mode: the original skin's font and a pixel font are both unsmoothed at scale 1.
+    /// </summary>
     readonly TextureCache<string> _cache = new(64L << 20);
-    (bool Smooth, int Scale, UiFont Font) _cacheMode = (false, 1, default);
+    (bool Restyled, bool Smooth, int Scale, UiFont Font) _cacheMode = (false, false, 1, default);
     public string FaceName { get; }
     public int Height { get; }
 
@@ -264,10 +267,10 @@ public sealed class GdiText : IDisposable
     {
         if (s.Length == 0) return null;
         var (font, smooth, k, face) = Current();
-        if ((smooth, k, Ui.Font) != _cacheMode)
+        if ((Ui.Restyled, smooth, k, Ui.Font) != _cacheMode)
         {
             ClearCache();
-            _cacheMode = (smooth, k, Ui.Font);
+            _cacheMode = (Ui.Restyled, smooth, k, Ui.Font);
         }
         TextImage Image(Texture2D t) => new(t, k, face?.Lift ?? 0, face?.RefHeight ?? 0);
         if (_cache.TryGet(s, out var t)) return Image(t);
