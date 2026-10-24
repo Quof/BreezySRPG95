@@ -59,6 +59,9 @@ public sealed class GameFolder
     /// <summary>Path of a file in the game folder, else the RTP folder, else null.</summary>
     public string? Find(string relative) => FindIn(Root, relative) ?? (RtpRoot is null ? null : FindIn(RtpRoot, relative));
 
+    /// <summary>Path of a file in the game folder itself (not the RTP's), else null.</summary>
+    public string? FindOwn(string relative) => FindIn(Root, relative);
+
     /// <summary>Reads a data file from the game folder itself (data never falls back to the RTP).</summary>
     public byte[] ReadData(string relative) =>
         File.ReadAllBytes(FindIn(Root, relative) ?? throw new FileNotFoundException($"missing game file {relative}", Path.Combine(Root, relative)));

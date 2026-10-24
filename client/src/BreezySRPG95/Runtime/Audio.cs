@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using MeltySynth;
 using Microsoft.Xna.Framework.Audio;
+using NLayer;
 using Srpg95.Data;
 
 namespace BreezySRPG95.Runtime;
@@ -9,7 +10,8 @@ namespace BreezySRPG95.Runtime;
 /// Sound effects from the original WAVs (all PCM mono 8/16-bit) and looping BGM. MIDI BGM plays either through
 /// a SoundFont synthesizer (MeltySynth, the modern option; consistent on every PC) or the Windows MCI sequencer
 /// (the Microsoft GS Wavetable synth, what the original runtime used). WAV BGM (some games loop a sound effect as their
-/// music) loops seamlessly as a sound of its own; one that isn't plain PCM goes through MCI.
+/// music) loops seamlessly as a sound of its own; one that isn't plain PCM goes through MCI. A WAV track a game ships as
+/// an MP3 for its music setup to make (Ruby2's MusicSetUp) plays from the MP3 (<see cref="SetUpMp3"/>).
 /// System sounds the runtime plays itself, from the game folder: FUN_00409428's CLICK.WAV (0, on confirm and when
 /// advancing text), CANCEL.WAV (1), BUZZER.WAV (2, an unavailable choice) and DOWN.WAV (3, a unit falling), and
 /// LEVELUP.WAV when the level-up panel opens (FUN_00410a88) or a class changes (FUN_0040be00).
@@ -36,6 +38,7 @@ public sealed class Audio(GameFolder game) : IDisposable
             _musicVolume = value;
             if (_stream is not null) _stream.Volume = Math.Clamp(value, 0, 1);
             if (_wavLoop is not null) _wavLoop.Volume = Math.Clamp(value, 0, 1);
+            if (_mp3Stream is not null) _mp3Stream.Volume = Math.Clamp(value, 0, 1);
             if (_bgmOpen) Mci($"setaudio breezy_bgm volume to {(int)(value * 1000)}");
         }
     }
@@ -133,13 +136,16 @@ public sealed class Audio(GameFolder game) : IDisposable
     public void PlayBgm(string file)
     {
         string? next = file == "(OFF)" || file.Length == 0 ? null : file;
-        if (string.Equals(next, CurrentBgm, StringComparison.OrdinalIgnoreCase) && (_bgmOpen || _stream is not null || _wavLoop is not null)) return;
+        if (string.Equals(next, CurrentBgm, StringComparison.OrdinalIgnoreCase) && (_bgmOpen || _stream is not null || _wavLoop is not null || _mp3Stream is not null)) return;
         StopBgm();
         CurrentBgm = next;
+        BgmMp3 = null;
         _bgmLengthMs = 0;
         if (next is null) return;
-        var path = game.Find("BGM/" + next);
+        var path = BgmPath(game, next);
         if (path is null) return;
+        bool mp3 = path.EndsWith(".mp3", StringComparison.OrdinalIgnoreCase);
+        if (mp3) BgmMp3 = Path.GetFileName(path);
         // a MIDI file with long silence at its ends plays without most of it (MidiTrim)
         byte[]? midiBytes = null, fileBytes = null;
         try { fileBytes = Bytes(path, keep: true); } catch (Exception) { }
@@ -164,6 +170,11 @@ public sealed class Audio(GameFolder game) : IDisposable
                 return;
             }
             catch (Exception) { StopSynth(); }   // fall back to MCI
+        }
+        if (mp3)
+        {
+            try { PlayMp3(fileBytes ?? File.ReadAllBytes(path)); } catch (Exception) { StopMp3(); }   // a damaged MP3 stays silent
+            return;
         }
         if (!midi)
         {
@@ -200,7 +211,7 @@ public sealed class Audio(GameFolder game) : IDisposable
         catch (Exception) { return null; }
     }
 
-    /// <summary>A BGM file's playing time (<paramref name="bytes"/>: the file, a MIDI one as trimmed): a MIDI file's last event, a WAV's data at its byte rate.</summary>
+    /// <summary>A BGM file's playing time (<paramref name="bytes"/>: the file, a MIDI one as trimmed): a MIDI file's last event, a WAV's data at its byte rate, an MP3's frames.</summary>
     static double LengthMs(string path, byte[]? bytes)
     {
         try
@@ -208,6 +219,8 @@ public sealed class Audio(GameFolder game) : IDisposable
             if (path.EndsWith(".mid", StringComparison.OrdinalIgnoreCase))
                 return (bytes is null ? new MidiFile(path) : new MidiFile(new MemoryStream(bytes))).Length.TotalMilliseconds;
             var b = bytes ?? File.ReadAllBytes(path);
+            if (path.EndsWith(".mp3", StringComparison.OrdinalIgnoreCase))
+                return new MpegFile(new MemoryStream(b)).Duration.TotalMilliseconds;
             int pos = 12, byteRate = 0;
             while (pos + 8 <= b.Length)
             {
@@ -228,6 +241,7 @@ public sealed class Audio(GameFolder game) : IDisposable
     void StopBgm()
     {
         StopSynth();
+        StopMp3();
         _wavLoop?.Stop();
         _wavLoop?.Dispose();
         _wavBgm?.Dispose();
@@ -238,21 +252,105 @@ public sealed class Audio(GameFolder game) : IDisposable
         _bgmOpen = false;
     }
 
-    /// <summary>Call every frame: keeps the synth fed and restarts MCI BGM when it reaches the end (looping).</summary>
+    /// <summary>Call every frame: keeps the synth and the MP3 track fed and restarts MCI BGM when it reaches the end (looping).</summary>
     public void Update()
     {
         _bgmPlayedMs += GameClock.FrameMs;
         FeedSynth();
+        FeedMp3();
         if (!_bgmOpen || ++_pollFrames < 30) return;
         _pollFrames = 0;
         if (Mci("status breezy_bgm mode") == "stopped") Mci("play breezy_bgm from 0");
     }
 
+    // ---------------- MP3 (MusicSetUp) ----------------
+
+    /// <summary>
+    /// The MP3 a missing WAV track is made from, or null. Ruby2 ships its CD-quality music as MP3s in MP3_File, for 稲富祥哲's
+    /// MusicSetUp (MP3_D.exe, set up by mp3_D2.ini) to decode once, before the game is played, into WAVs of the same names in
+    /// BGM (Ruby2_1.mp3 becomes Ruby2_1.wav; 380 MB of them), which the events and maps ask for. Its first map plays one as
+    /// a test and asks the player to quit and set the music up if nothing is heard. Here such a track plays from the MP3,
+    /// decoded as it plays (NLayer, to the samples Windows' own MP3 decoder gives), and loops as the WAV would.
+    /// </summary>
+    internal static string? SetUpMp3(GameFolder game, string file) =>
+        file.EndsWith(".wav", StringComparison.OrdinalIgnoreCase) ? game.FindOwn("MP3_File/" + Path.ChangeExtension(file, ".mp3")) : null;
+
+    /// <summary>A track's file: the game's own, else the MP3 its music setup makes it from, else the RTP's; null if none.</summary>
+    internal static string? BgmPath(GameFolder game, string file) =>
+        game.FindOwn("BGM/" + file) ?? SetUpMp3(game, file) ?? game.Find("BGM/" + file);
+
+    /// <summary>The MP3 file the current track plays from (<see cref="SetUpMp3"/>), or null.</summary>
+    public string? BgmMp3 { get; private set; }
+
+    MpegFile? _mp3;
+    DynamicSoundEffectInstance? _mp3Stream;
+    float[] _mp3Samples = [];
+    byte[] _mp3Pcm = [];
+
+    void PlayMp3(byte[] file)
+    {
+        _mp3 = new MpegFile(new MemoryStream(file));
+        _mp3Samples = new float[Block * _mp3.Channels];
+        _mp3Pcm = new byte[_mp3Samples.Length * 2];
+        _mp3Stream = new DynamicSoundEffectInstance(_mp3.SampleRate, _mp3.Channels == 2 ? AudioChannels.Stereo : AudioChannels.Mono)
+            { Volume = Math.Clamp(_musicVolume, 0, 1) };
+        FeedMp3();
+        _mp3Stream?.Play();
+    }
+
+    /// <summary>Keeps three blocks of the MP3 track queued.</summary>
+    void FeedMp3()
+    {
+        if (_mp3Stream is null || _mp3 is null) return;
+        try
+        {
+            while (_mp3Stream.PendingBufferCount < 3)
+            {
+                int bytes = NextBlock(_mp3, _mp3Samples, _mp3Pcm);
+                if (bytes == 0) { StopMp3(); return; }
+                _mp3Stream.SubmitBuffer(_mp3Pcm, 0, bytes);
+            }
+        }
+        catch (Exception) { StopMp3(); }   // a damaged file: silent from there on
+    }
+
+    /// <summary>
+    /// The MP3 track's next block (<paramref name="samples"/>' length) as 16-bit PCM in <paramref name="pcm"/>: its length
+    /// in bytes, 0 for a file without sound. At its end the track goes on from its start with no gap, as a looping WAV.
+    /// </summary>
+    internal static int NextBlock(MpegFile mp3, float[] samples, byte[] pcm)
+    {
+        int n = 0;
+        bool rewound = false;
+        while (n < samples.Length)
+        {
+            int got = mp3.ReadSamples(samples, n, samples.Length - n);
+            if (got > 0) { n += got; rewound = false; continue; }
+            if (rewound) break;   // nothing from the start either
+            mp3.Position = 0;
+            rewound = true;
+        }
+        for (int i = 0; i < n; i++)
+        {
+            short s = (short)Math.Clamp(samples[i] * 32767f, short.MinValue, short.MaxValue);
+            pcm[i * 2] = (byte)s;
+            pcm[i * 2 + 1] = (byte)(s >> 8);
+        }
+        return n * 2;
+    }
+
+    void StopMp3()
+    {
+        _mp3Stream?.Stop();
+        _mp3Stream?.Dispose();
+        (_mp3Stream, _mp3) = (null, null);
+    }
+
     // ---------------- sound effects ----------------
 
     /// <summary>
-    /// The EFS and BGM folders' files read ahead (<see cref="Prepare"/>), by path: a sound's until it becomes one, the
-    /// music's for good (a track comes back, and all of a game's is a few MB).
+    /// The EFS, BGM and MP3_File folders' files read ahead (<see cref="Prepare"/>), by path: a sound's until it becomes
+    /// one, the music's for good (a track comes back, and all of a game's is a few MB; Ruby2's MP3s, 40 MB).
     /// </summary>
     readonly ConcurrentDictionary<string, byte[]> _readAhead = new(StringComparer.OrdinalIgnoreCase);
 
@@ -269,12 +367,14 @@ public sealed class Audio(GameFolder game) : IDisposable
     /// Gets the sounds ready before they're needed, as the original does: it starts its sound at start-up and reserves
     /// its four system sounds then (HarmonyInitWave, FUN_00409484), and caches a battle animation's sound before its
     /// scene (HarmonyCacheSound). Here the audio device and the system sounds now, and the rest of the EFS and BGM folders
-    /// (the game's and the RTP's) read into memory in the background — at most about 25 MB in the games here — so no sound
-    /// or track waits on the disk (a sleeping USB drive's can take seconds) when it first plays.
+    /// (the game's and the RTP's) and MP3_File (<see cref="SetUpMp3"/>) read into memory in the background — at most about
+    /// 25 MB in the games here, 60 MB with Ruby2's MP3s — so no sound or track waits on the disk (a sleeping USB drive's can
+    /// take seconds) when it first plays.
     /// </summary>
     public void Prepare()
     {
-        var folders = game.Folders("EFS").Concat(game.Folders("BGM")).ToList();   // looked up here: GameFolder isn't thread-safe
+        // looked up here: GameFolder isn't thread-safe
+        var folders = game.Folders("EFS").Concat(game.Folders("BGM")).Concat(game.Folders("MP3_File")).ToList();
         if (!Muted) foreach (var f in new[] { "CLICK.WAV", "CANCEL.WAV", "BUZZER.WAV", "DOWN.WAV", "LEVELUP.WAV" }) Sound(f);
         Task.Run(() =>
         {

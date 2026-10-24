@@ -1613,7 +1613,7 @@ public sealed class BreezyGame : Game
         if (_session is null || _runner is null) return "";
         string shown = _runner.Message is { } msg ? "message: " + string.Join(" / ", msg.Lines)
             : _runner.Choice is { } ch ? $"choice {_runner.ChoiceIndex}: {string.Join(" / ", ch)}" : "message: none";
-        return $"{shown}\nface {_runner.Message?.Face} brightness {_fx.Brightness} tone {_fx.Tone} pictures [{string.Join(",", _fx.Pictures.Select(p => p.File))}] bgm {_audio.CurrentBgm} camera {_session.Camera}\n"
+        return $"{shown}\nface {_runner.Message?.Face} brightness {_fx.Brightness} tone {_fx.Tone} pictures [{string.Join(",", _fx.Pictures.Select(p => p.File))}] bgm {_audio.CurrentBgm}{(_audio.BgmMp3 is { } mp3 ? $" (MP3_File/{mp3})" : "")} camera {_session.Camera}\n"
             + $"gold {_state.Gold} items {string.Join(",", _state.Items.Select(kv => $"{kv.Key}x{kv.Value}"))} switches {string.Join(",", Enumerable.Range(0, GameState.SwitchCount).Where(i => _state.Switches[i]))} "
             + $"variables {string.Join(",", Enumerable.Range(0, GameState.VariableCount).Where(i => _state.Variables[i] != 0).Select(i => $"{i}={_state.Variables[i]}"))}\n";
     }
@@ -1787,7 +1787,7 @@ public sealed class BreezyGame : Game
     {
         var lines = new List<string>
         {
-            $"SMAP_{_mapIndices[_mapPos] + 1:000} {_session?.Map.Name}  BGM {_audio.CurrentBgm ?? "-"}  font {_ui.Text.FaceName}",
+            $"SMAP_{_mapIndices[_mapPos] + 1:000} {_session?.Map.Name}  BGM {_audio.CurrentBgm ?? "-"}{(_audio.BgmMp3 is { } mp3 ? $" (MP3_File/{mp3})" : "")}  font {_ui.Text.FaceName}",
             $"gold {_state.Gold}  roster {string.Join(",", _state.Roster.Select(kv => kv.Value.Sortie ? $"{kv.Key}*" : $"{kv.Key}"))}  next {_state.NextMap}  event {_runner?.Name} {(_runner?.Running == true ? "running" : "idle")}",
         };
         lines.AddRange(_runner?.Log.TakeLast(8) ?? Enumerable.Empty<string>());

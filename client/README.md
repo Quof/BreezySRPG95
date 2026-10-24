@@ -1,6 +1,6 @@
 # BreezySRPG95
 
-A modern replacement client for games made with Sim RPG Maker 95 (シミュレーションRPGツクール95), started for えるまに and checked against ＯtoＺ, 昴の騎士 and 闇鍋企画 as well. It reads the original game folder directly (`SRPGEXEC.EXE`'s data files, BMP graphics, MIDI/WAV audio) and never modifies it. Format documentation lives in [`../re/FORMAT_NOTES.md`](../re/FORMAT_NOTES.md).
+A modern replacement client for games made with Sim RPG Maker 95 (シミュレーションRPGツクール95), started for えるまに and checked against ＯtoＺ, 昴の騎士 and 闇鍋企画 as well. It reads the original game folder directly (`SRPGEXEC.EXE`'s data files, BMP graphics, MIDI/WAV audio, and MP3 music shipped for a music setup tool) and never modifies it. Format documentation lives in [`../re/FORMAT_NOTES.md`](../re/FORMAT_NOTES.md).
 
 ## Stack
 
@@ -9,6 +9,7 @@ A modern replacement client for games made with Sim RPG Maker 95 (シミュレ�
 | Language/runtime | C# / .NET 8 | Ships as a self-contained Windows build (no runtime install for players). Fast, with good tooling and first-class Shift-JIS support via `System.Text.Encoding.CodePages` |
 | Engine | MonoGame 3.8 (DesktopGL) | A code-first 2D framework. The game is fully data-driven from the original files, so a scene editor (Godot/Unity) would add weight without helping. Gives pixel-perfect scaling and borderless fullscreen |
 | Music | MeltySynth + a General MIDI SoundFont | Pure-C# SoundFont synthesizer: consistent, good-sounding MIDI on every PC instead of the Windows GS wavetable, with user-replaceable SoundFonts |
+| MP3 | [NLayer](https://github.com/naudio/NLayer) 3.0.0, as source with two fixes (`src/NLayer`) | Pure-C# MP3 decoder for the music a game ships as MP3s (Ruby2); fixed where it dropped frames (its bit reservoir's wrap) and mangled MPEG-2 intensity stereo, to decode as Windows' own decoder does |
 | Text | Windows GDI on Windows; FreeType ([FreeTypeSharp](https://github.com/ryancheung/FreeTypeSharp)) elsewhere | GDI draws the original's own MS Gothic exactly, and the Windows fonts; FreeType draws the fonts inside the exe the same way on Linux and macOS, with IPAGothic in MS Gothic's place (`Ui/TextFont.cs`) |
 
 Alternatives considered:
@@ -22,6 +23,7 @@ Alternatives considered:
 client/
   src/Srpg95.Data/          format loaders (C# port of re/srpg95_data.py)
   src/BreezySRPG95/              the game (MonoGame)
+  src/NLayer/               the MP3 decoder (NLayer's source, fixed: see its README)
   tests/Srpg95.Data.Tests/  cross-checks every loader against the Python reference JSON
 ```
 
@@ -88,6 +90,8 @@ Set `SRPG95_REQUIRE_DATA=1` to make the tests fail instead of silently passing w
 Put `BreezySRPG95.exe` (one file, from a published build) in the game folder, next to `SRPGEXEC.EXE`, and run it; or run it from anywhere with `--game "<game folder>"`. No .NET install is needed: the runtime, SDL2, OpenAL and FreeType are inside the exe (the three native libraries are unpacked to `%TEMP%\.net\BreezySRPG95` on the first start; FreeType only draws text with `BREEZY_TEXT=freetype`). Nothing is written next to the exe: settings live in `%APPDATA%\BreezySRPG95\settings.json`, shared by every game, and saves go where the original keeps them (the game folder). A `settings.json` placed beside the exe is used instead, for a setup that keeps its own.
 
 Music plays through **GeneralUser GS** (v2.0.3, by S. Christian Collins, [schristiancollins.com](http://www.schristiancollins.com)), a GS SoundFont embedded in the exe, so everyone hears the same soundtrack; its licence ([`src/BreezySRPG95/soundfont/GeneralUser-GS-LICENSE.txt`](src/BreezySRPG95/soundfont/GeneralUser-GS-LICENSE.txt)) allows bundling it. Under Options you can switch to another `.sf2` put in a `soundfonts` folder next to the exe or in the game folder, or to Windows MIDI as in the original. A MIDI track plays without the silence before its first note and after its last one, so no repeat waits: ＯtoＺ's `legend.mid` ended in 26 s of silence. The first build downloads the SoundFont from the author's repository (hash-checked); it isn't kept in git.
+
+Ruby2 ships its CD-quality music as MP3s in `MP3_File`, for MusicSetUp (`MP3_D.exe`, by 稲富祥哲) to decode once into WAVs in `BGM` (380 MB), the names its events and maps ask for; its first map plays one as a test and asks the player to set the music up if nothing is heard. A WAV track that isn't in `BGM` plays from `MP3_File`'s MP3 of the same name instead, decoded as it plays and looped as the WAV would be (`Runtime/Audio.cs`: `SetUpMp3`); once set up, the WAVs play. The F3 overlay and a scripted run's state show `(MP3_File/…)` after the track's name.
 
 ```bash
 dotnet publish client/src/BreezySRPG95 -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -o client/publish

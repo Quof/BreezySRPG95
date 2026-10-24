@@ -2,6 +2,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Srpg95.Data\Srpg95.Data.csproj" />
+    <!-- the MP3 decoder (Runtime/Audio.cs: SetUpMp3), NLayer's source with two fixes -->
+    <ProjectReference Include="..\NLayer\NLayer.csproj" />
   </ItemGroup>
 
   <!-- the tests reach the FreeType renderer's font handling (Ui/FreeTypeText.cs: FreeTypeFonts) -->
