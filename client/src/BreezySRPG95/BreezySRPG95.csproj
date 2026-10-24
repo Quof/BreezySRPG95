@@ -23,7 +23,7 @@
     <!-- the player's name for the client; the project and namespaces keep the name it was started under -->
     <AssemblyName>BreezySRPG95</AssemblyName>
     <!-- the release version: the exe's file and product version (Properties > Details) -->
-    <Version>0.1.0</Version>
+    <Version>0.5</Version>
     <Product>BreezySRPG95</Product>
     <AssemblyTitle>BreezySRPG95</AssemblyTitle>
     <Product>BreezySRPG95</Product>
