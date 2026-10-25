@@ -13,7 +13,8 @@ Tested: えるまに, ＯtoＺ, 昴の騎士, 闇鍋企画 (前編, 完結編).
 Windows 10/11, 64-bit. Nothing to install.
 From elsewhere: `BreezySRPG95.exe --game "C:\path\to\game folder"`
 
-- Menus start in Japanese. For English: F1 > 画面 > 言語.
+- Menus start in English on an English system, else Japanese.
+  To change: F1 > Display (画面) > Language (言語).
 - Settings: `%APPDATA%\BreezySRPG95\settings.json` (shared by all games).
 - The first start unpacks three DLLs to `%TEMP%\.net\BreezySRPG95`.
 

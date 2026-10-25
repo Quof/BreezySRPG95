@@ -187,8 +187,26 @@ public sealed class Settings
             }
             catch (Exception) { /* unreadable: fall back to defaults */ }
         }
-        return new Settings { Path = UserSettings };
+        return new Settings { Path = UserSettings, Language = SystemLanguage() };   // a first start: its menus in the system's language
     }
+
+    /// <summary>
+    /// English when the system's language is English, else Japanese (the games' own): Windows' display language
+    /// (GetUserDefaultUILanguage; the runtime is culture-neutral, so it can't say), elsewhere LC_ALL, LC_MESSAGES or LANG.
+    /// </summary>
+    static UiLanguage SystemLanguage()
+    {
+        try
+        {
+            if (OperatingSystem.IsWindows()) return (GetUserDefaultUILanguage() & 0x3ff) == 0x09 ? UiLanguage.English : UiLanguage.Japanese;
+            string? locale = new[] { "LC_ALL", "LC_MESSAGES", "LANG" }.Select(Environment.GetEnvironmentVariable).FirstOrDefault(v => !string.IsNullOrEmpty(v));
+            return locale is not null && locale.StartsWith("en", StringComparison.OrdinalIgnoreCase) ? UiLanguage.English : UiLanguage.Japanese;
+        }
+        catch (Exception) { return UiLanguage.Japanese; }
+    }
+
+    [System.Runtime.InteropServices.DllImport("kernel32.dll")]
+    static extern ushort GetUserDefaultUILanguage();
 
     /// <summary>Where settings live: the user's AppData, shared by every game the client is dropped into.</summary>
     static string UserSettings => System.IO.Path.Combine(UserFolder, "settings.json");
