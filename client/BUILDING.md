@@ -114,7 +114,7 @@ dotnet publish client/src/BreezySRPG95 -c Release -r osx-arm64 --self-contained 
 dotnet publish client/src/BreezySRPG95 -c Release -r osx-x64 --self-contained -p:PublishSingleFile=true -o client/publish-mac-x64
 ```
 
-Laid out as on Linux: the program, with `libSDL2.dylib`, `libopenal.1.dylib` and `libfreetype.dylib` beside it (universal, x86-64 and arm64, their arm64 code signed), packed by `make_tarball.py` as `BreezySRPG95-v<version>-mac-arm64.tar.gz` (Apple Silicon) and `-mac-x64` (Intel); macOS 12 or newer. Not yet tried on a Mac. Built on Windows, the program isn't signed (the SDK signs only on a Mac) and Apple Silicon runs no unsigned code, so the package's README-MAC.txt has the player sign it locally once (`codesign --force --sign - BreezySRPG95`, built into macOS) after clearing the download's quarantine (`xattr -dr com.apple.quarantine .`). Settings live in `~/.config/BreezySRPG95/settings.json`.
+Laid out as on Linux: the program, with `libSDL2.dylib`, `libopenal.1.dylib` and `libfreetype.dylib` beside it (universal, x86-64 and arm64, their arm64 code signed), packed by `make_tarball.py` as `BreezySRPG95-v<version>_mac-arm64.tar.gz` (Apple Silicon) and `_mac-x64` (Intel); macOS 12 or newer. Not yet tried on a Mac. Built on Windows, the program isn't signed (the SDK signs only on a Mac) and Apple Silicon runs no unsigned code, so the package's README-MAC.txt has the player sign it locally once (`codesign --force --sign - BreezySRPG95`, built into macOS) after clearing the download's quarantine (`xattr -dr com.apple.quarantine .`). Settings live in `~/.config/BreezySRPG95/settings.json`.
 
 The icon is 昴の騎士's face graphic FACE_003, made into `src/BreezySRPG95/Icon.ico` by `client/tools/make_icon.py`.
 
