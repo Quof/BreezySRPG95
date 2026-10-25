@@ -74,7 +74,7 @@ public sealed class BreezyGame : Game
     MapOutcome _seenOutcome;
     int[] _mapIndices = Array.Empty<int>();
     int _mapPos, _frame, _shotAdvance;
-    bool _debug;
+    bool _debug = false;   // the F3 overlay: only a Debug build turns it on
     KeyboardState _prevKeys;
     MouseState _prevMouse;
     int _activeFrames, _leftHeld, _confirmHeld;
@@ -542,7 +542,10 @@ public sealed class BreezyGame : Game
             _settings.Scaling = _settings.Scaling == Scaling.Integer ? Scaling.Fit : Scaling.Integer;
             _settings.Save();
         }
+        // the debug overlay: development (Debug) builds only, so a released game never shows it or its map keys
+#if DEBUG
         if (Pressed(Keys.F3)) _debug = !_debug;
+#endif
         // the developer's map keys, only while the debug overlay is up: a stray press mustn't drop a player on another map
         if (_debug && _session is not null && Pressed(Keys.PageDown)) LoadMap((_mapPos + 1) % _mapIndices.Length);
         if (_debug && _session is not null && Pressed(Keys.PageUp)) LoadMap((_mapPos + _mapIndices.Length - 1) % _mapIndices.Length);

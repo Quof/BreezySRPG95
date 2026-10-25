@@ -141,8 +141,8 @@ A gamepad works too (the first one connected: Xbox, PlayStation and most others,
 | Right click during an event | a menu at the pointer: save, load, options (環境設定), in the middle of the cutscene |
 | F4 or Alt+Enter | fullscreen |
 | F5 | switch pixel-perfect / fit scaling |
-| F3 | debug overlay (map, BGM, event log) |
-| PageUp / PageDown | previous / next map (developer; only while the F3 overlay is up) |
+| F3 | debug overlay (map, BGM, event log; Debug builds only) |
+| PageUp / PageDown | previous / next map (developer; only while the F3 overlay is up, so Debug builds only) |
 
 ## Options (modern features)
 
