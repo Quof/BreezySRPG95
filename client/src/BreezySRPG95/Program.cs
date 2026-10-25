@@ -25,7 +25,7 @@ public static class Program
         {
             ErrorBox.Show("No SRPG Maker 95 game found.\n\n"
                 + "Put BreezySRPG95 in the game's folder, next to SRPGEXEC.EXE, and start it from there.\n\n"
-                + "SRPG Maker 95のゲームが見つかりません。\n"
+                + "シミュレーションRPGツクール95のゲームが見つかりません。\n"
                 + "BreezySRPG95 をゲームのフォルダ（SRPGEXEC.EXE と同じ場所）に置いて起動してください。");
             return 1;
         }
