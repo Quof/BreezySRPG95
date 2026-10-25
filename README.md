@@ -19,6 +19,30 @@ From elsewhere: `BreezySRPG95.exe --game "C:\path\to\game folder"`
 
 Linux and macOS: see `README-LINUX.txt` / `README-MAC.txt` in those packages.
 
+## Features
+
+1) Resizable window and borderless fullscreen with various scaling and filtering options.
+2) Fully rebindable keyboard controls so one does not have to use the mouse for everything, plus gamepad support too.
+3) Fast-forward (hold or toggle) button to speed up movement, battles, and/or text.
+4) Option to skip the enemy turn (with notifications for EXP gain and such throughout the turn)
+5) Cutscene skip
+6) Faster unit movement (1x, 2x, and 4x options)
+7) Save anywhere, including in the middle of cutscenes.
+8) 100 save slots instead of 8 - and save compatibility between the original and this interpreter.
+9) Battle forecast before combat showing damage, accuracy, etc.
+10) Enemy range display to see the overall zone of danger from all enemies combined
+11) Clicking units also shows their movement and attack range.
+12) Optional weakness display to show what elements units are weak to, as well as indicators for when your attack is boosted by said elements.
+13) Optional HP display under units on the map
+14) Text backlog with sprites
+15) New user interfaces, plus various font choices
+16) Built-in MIDI soundfont to play the music at a higher quality (with optional looping)
+17) Can turn off combat BGM (it's a problem because the combat bgm only plays for like 10 seconds, and resets the background music, interrupting it constantly across a map)
+18) Various modes for battle animations (can turn them off and have simplified combat reports like in modern SRPGs)
+19) Terrain info shown on cursor hover
+20) More detail when inspecting units, e.g. can see their abilities outside of the camp menu + can see the stats on equipment
+21) Numerous more fixes and minor features not necessarily worth mentioning in details, like BGM and SE volume sliders and being able to cycle through ally units that can still move.
+
 ## Saves
 
 - Files 1-8 are the original's `SAVE1-8.DAT` and work in both programs.
