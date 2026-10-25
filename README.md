@@ -61,7 +61,9 @@ unit, D-pad / left stick cursor, right stick map.
 
 ## Credits and licences
 
-- .NET 8 (Microsoft), MonoGame 3.8, SDL2.
+The licences in full are in each release package's `Third-Party-Licenses.txt`.
+
+- .NET 8 (Microsoft), MonoGame 3.8 (with NVorbis), SDL2.
 - OpenAL Soft 1.25.2 (Chris Robinson), LGPL.
 - FreeType 2.13, through FreeTypeSharp (Linux and macOS text). Portions of
   this software are copyright (C) 2023 The FreeType Project
