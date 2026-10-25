@@ -21,12 +21,68 @@ public static class Program
             g.Run();
             return 0;
         }
-        catch (Exception e)
+        catch (NoGameException)
         {
-            // WinExe has no console: leave the error next to the executable (a scripted run: next to its screenshot)
-            File.WriteAllText(opts?.Screenshot is { } shot ? Path.ChangeExtension(shot, ".error.txt") : Path.Combine(AppContext.BaseDirectory, "error.log"), e.ToString());
+            ErrorBox.Show("No SRPG Maker 95 game found.\n\n"
+                + "Put BreezySRPG95 in the game's folder, next to SRPGEXEC.EXE, and start it from there.\n\n"
+                + "SRPG Maker 95のゲームが見つかりません。\n"
+                + "BreezySRPG95 をゲームのフォルダ（SRPGEXEC.EXE と同じ場所）に置いて起動してください。");
             return 1;
         }
+        catch (Exception e)
+        {
+            // a scripted run: the error next to its screenshot, no box; else error.log beside the program (or in the
+            // settings folder where that can't be written), and a box saying where — WinExe has no console
+            if (opts?.Screenshot is { } shot) { File.WriteAllText(Path.ChangeExtension(shot, ".error.txt"), e.ToString()); return 1; }
+            string? log = WriteLog(e.ToString());
+            ErrorBox.Show("BreezySRPG95 ran into a problem and has to close.\n\n"
+                + (log is not null ? $"Details were saved to error.log:\n{log}\n\nPlease send it with your report." : e.Message) + "\n\n"
+                + "問題が発生したため終了します。" + (log is not null ? "詳細は error.log に保存されました。" : ""));
+            return 1;
+        }
+    }
+
+    /// <summary>error.log beside the program, else in the settings folder; where it went, or null.</summary>
+    static string? WriteLog(string text)
+    {
+        foreach (var dir in new[] { AppContext.BaseDirectory, Config.Settings.UserFolder })
+            try
+            {
+                Directory.CreateDirectory(dir);
+                string path = Path.Combine(dir, "error.log");
+                File.WriteAllText(path, text);
+                return path;
+            }
+            catch (Exception) { /* not writable: the next place */ }
+        return null;
+    }
+}
+
+/// <summary>No game folder: none given, and none beside the program or in a folder above it.</summary>
+public sealed class NoGameException() : Exception("No SRPG Maker 95 game found (no folder with SRPGEXEC.EXE). Pass --game <folder>.");
+
+/// <summary>
+/// A message box for when the game can't start or has to stop: SDL's own (SDL_ShowSimpleMessageBox, which needs no
+/// window and works on every system the program runs on), from the SDL2 library the program carries.
+/// </summary>
+static unsafe class ErrorBox
+{
+    const uint SdlMessageBoxError = 0x10;
+
+    public static void Show(string message)
+    {
+        try
+        {
+            IntPtr lib = IntPtr.Zero;
+            foreach (var name in new[] { "SDL2.dll", "libSDL2-2.0.so.0", "libSDL2.dylib" })
+                if (System.Runtime.InteropServices.NativeLibrary.TryLoad(name, typeof(Program).Assembly, null, out lib)) break;
+            if (lib == IntPtr.Zero || !System.Runtime.InteropServices.NativeLibrary.TryGetExport(lib, "SDL_ShowSimpleMessageBox", out var fn)) return;
+            var show = (delegate* unmanaged[Cdecl]<uint, byte*, byte*, IntPtr, int>)fn;
+            fixed (byte* title = System.Text.Encoding.UTF8.GetBytes("BreezySRPG95\0"))
+            fixed (byte* text = System.Text.Encoding.UTF8.GetBytes(message + "\0"))
+                show(SdlMessageBoxError, title, text, IntPtr.Zero);
+        }
+        catch (Exception) { /* no box: error.log stands */ }
     }
 }
 
@@ -91,8 +147,8 @@ public sealed record Options(string GameDir, string? RtpDir, int? StartMap, stri
                 case "--frames": frames = int.Parse(args[i + 1]); break;
             }
         }
-        game ??= FindGameFolder() ?? throw new DirectoryNotFoundException(
-            "Game folder not found. Pass --game <folder containing SRPGEXEC.EXE>.");
+        game ??= FindGameFolder() ?? throw new NoGameException();
+        if (!Directory.Exists(game)) throw new NoGameException();
         rtp ??= FindUp(AppContext.BaseDirectory, Path.Combine("srpg maker 95", "RTP"));
         return new Options(game, rtp, map, shot, advance, ev, keys, level, give, place, loadSlot, campBefore, saves, choose, scale, fast, frames);
     }

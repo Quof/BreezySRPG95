@@ -191,7 +191,10 @@ public sealed class Settings
     }
 
     /// <summary>Where settings live: the user's AppData, shared by every game the client is dropped into.</summary>
-    static string UserSettings => System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "BreezySRPG95", "settings.json");
+    static string UserSettings => System.IO.Path.Combine(UserFolder, "settings.json");
+
+    /// <summary>BreezySRPG95's folder in the user's AppData (~/.config off Windows): the settings, and error.log where the program's own folder can't take it.</summary>
+    public static string UserFolder => System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "BreezySRPG95");
 
     /// <summary>Read in this order: a settings.json next to the executable (a portable setup that keeps its own), then the user's.</summary>
     static IEnumerable<string> Candidates()

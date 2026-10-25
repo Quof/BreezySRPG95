@@ -197,4 +197,26 @@ public class SaveListTests
         }
         finally { Directory.Delete(root, recursive: true); }
     }
+
+    [Fact]
+    public void An_index_that_cant_be_read_is_never_written_over()
+    {
+        var root = TempDir("notes-locked");
+        try
+        {
+            var g = new GameFolder(root);
+            SaveExtras.Write(g, 1, Save(true, 0, 0), 10, null);
+            string before = File.ReadAllText(SaveExtras.IndexPath(g));
+            // locked (an antivirus, a sync program): the new note is given up, the others kept
+            using (new FileStream(SaveExtras.IndexPath(g), FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+                Assert.Throws<IOException>(() => SaveExtras.Write(g, 2, Save(true, 1, 0), 20, null));
+            Assert.Equal(before, File.ReadAllText(SaveExtras.IndexPath(g)));
+            // no longer an index: kept aside, and a new one begun
+            File.WriteAllText(SaveExtras.IndexPath(g), "not an index");
+            SaveExtras.Write(g, 3, Save(true, 2, 0), 30, null);
+            Assert.Equal("not an index", File.ReadAllText(SaveExtras.IndexPath(g) + ".damaged"));
+            Assert.Equal(30.0, Assert.Single(SaveExtras.Read(g)).Value.PlaySeconds);
+        }
+        finally { Directory.Delete(root, recursive: true); }
+    }
 }

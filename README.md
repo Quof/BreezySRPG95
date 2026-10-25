@@ -53,7 +53,8 @@ unit, D-pad / left stick cursor, right stick map.
 
 ## Problems
 
-- A crash writes `error.log` next to the exe. Please send it.
+- A crash shows a message and writes `error.log` next to the exe (or in the
+  settings folder). Please send it.
 - A missing game file is named on screen, then skipped.
 - When reporting, give the game, the map, and how it differs from
   `SRPGEXEC.EXE`.

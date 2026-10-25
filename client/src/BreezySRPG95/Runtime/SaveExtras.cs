@@ -16,7 +16,9 @@ namespace BreezySRPG95.Runtime;
 /// file's hash): a slot the original game saved over since shows none.
 /// A save's note is written after the save, off the game thread (<see cref="WriteLater"/>), one at a time in order;
 /// whatever reads the notes waits for those still being written. The files are replaced whole (written beside, then
-/// moved over), so nothing reads one half written.
+/// moved over), so nothing reads one half written. A note is never written over an index that couldn't be read: one
+/// locked for a moment (an antivirus, a sync program) is tried again, then the note is given up rather than the others;
+/// one that isn't an index any more is kept aside (saves.json.damaged) before a new one is started.
 /// </summary>
 public static class SaveExtras
 {
@@ -49,13 +51,35 @@ public static class SaveExtras
 
     static Dictionary<int, Note> ReadNow(GameFolder g)
     {
-        try
+        try { return ReadIndex(g); }
+        catch (Exception) { return new(); }   // for showing: what can't be read shows nothing
+    }
+
+    /// <summary>The index as it is on the disk (none when there's no file); throws when the file is there but can't be read.</summary>
+    static Dictionary<int, Note> ReadIndex(GameFolder g)
+    {
+        if (!File.Exists(IndexPath(g))) return new();
+        var raw = JsonSerializer.Deserialize<Dictionary<string, Note>>(File.ReadAllText(IndexPath(g)), Json) ?? new();
+        return raw.Where(kv => int.TryParse(kv.Key, out _)).ToDictionary(kv => int.Parse(kv.Key), kv => kv.Value);
+    }
+
+    /// <summary>
+    /// The index to add a note to: read again a few times over half a second while the file is locked (an IOException
+    /// still at the end goes up, and the note isn't written); a file that isn't an index is moved aside to
+    /// saves.json.damaged, and a new one begins.
+    /// </summary>
+    static Dictionary<int, Note> ReadForWriting(GameFolder g)
+    {
+        for (int attempt = 0; ; attempt++)
         {
-            if (!File.Exists(IndexPath(g))) return new();
-            var raw = JsonSerializer.Deserialize<Dictionary<string, Note>>(File.ReadAllText(IndexPath(g)), Json) ?? new();
-            return raw.Where(kv => int.TryParse(kv.Key, out _)).ToDictionary(kv => int.Parse(kv.Key), kv => kv.Value);
+            try { return ReadIndex(g); }
+            catch (IOException) when (attempt < 5) { Thread.Sleep(100); }
+            catch (Exception e) when (e is JsonException or NotSupportedException or InvalidOperationException)
+            {
+                File.Move(IndexPath(g), IndexPath(g) + ".damaged", overwrite: true);
+                return new();
+            }
         }
-        catch (Exception) { return new(); }
     }
 
     /// <summary>The note for the save now in <paramref name="slot"/>, if it still belongs to it.</summary>
@@ -80,7 +104,7 @@ public static class SaveExtras
     {
         lock (Files)
         {
-            var notes = ReadNow(g);
+            var notes = ReadForWriting(g);
             notes[slot] = new Note(playSeconds, Hash(save), scene);
             Directory.CreateDirectory(Folder(g));
             Replace(IndexPath(g), Encoding.UTF8.GetBytes(
