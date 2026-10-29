@@ -64,7 +64,7 @@ public sealed class Settings
     public int MusicVolume { get; set; } = 80;            // 0–100
     public int SoundVolume { get; set; } = 80;
     public MusicEngine Music { get; set; } = MusicEngine.SoundFont;
-    public string? SoundFont { get; set; }                // null = the built-in GeneralUser GS; else a file name in soundfonts/ or a full path
+    public string? SoundFont { get; set; }                // null = gm.dls, or without it the built-in GeneralUser GS; BuiltIn; else a file name in soundfonts/ or a full path
     public bool LoopMarkers { get; set; } = true;         // MIDI tracks repeat from their RPG Maker loop marker (SoundFont only)
     public ConfirmSound ConfirmSound { get; set; } = ConfirmSound.GameplayOnly;   // the CLICK.WAV "thunk" on confirms (at first not when a message is clicked away)
 
@@ -237,25 +237,58 @@ public sealed class Settings
         }
     }
 
+    static string[] SoundFontFolders(string gameRoot) =>
+        new[] { FileNames.In(AppContext.BaseDirectory, "soundfonts"), FileNames.In(gameRoot, "soundfonts"), gameRoot }.Where(Directory.Exists).ToArray();
+
     /// <summary>
-    /// SoundFonts the player can choose: *.sf2 and *.dls in soundfonts/ next to the executable and in the game folder (the
-    /// folder's name and the files' extension in any case, off Windows too), then Windows' own gm.dls (<see cref="WindowsGmDls"/>).
+    /// SoundFonts the player can choose besides gm.dls (<see cref="GmDls"/>) and the built-in one: the one given with
+    /// --soundfont, then *.sf2 and *.dls in soundfonts/ next to the executable and in the game folder (the folder's name and
+    /// the files' extension in any case, off Windows too).
     /// </summary>
     public static List<string> FindSoundFonts(string gameRoot)
     {
-        var dirs = new[] { FileNames.In(AppContext.BaseDirectory, "soundfonts"), FileNames.In(gameRoot, "soundfonts"), gameRoot };
-        var found = dirs.Where(Directory.Exists).SelectMany(d => new[] { "*.sf2", "*.dls" }.SelectMany(p => Directory.GetFiles(d, p, FileNames.AnyCase)));
+        var found = SoundFontFolders(gameRoot).SelectMany(d => new[] { "*.sf2", "*.dls" }.SelectMany(p => Directory.GetFiles(d, p, FileNames.AnyCase)));
         if (CommandLineSoundFont is { } given && File.Exists(given)) found = found.Prepend(given);
-        if (WindowsGmDls is { } gm) found = found.Append(gm);
-        return found.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        var gm = GmDls(gameRoot);
+        return found.Where(f => !string.Equals(f, gm, StringComparison.OrdinalIgnoreCase)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
     }
 
     /// <summary>
-    /// The Microsoft GS Wavetable synth's instruments (System32\drivers\gm.dls), what the games were made with, when this is
-    /// Windows and has them.
+    /// The Microsoft GS Wavetable synth's instruments, gm.dls, what the games were made with: the default, listed first.
+    /// Windows' own (System32\drivers); elsewhere one copied into a soundfonts/ folder, else the one in a Windows
+    /// installation mounted alongside (dual boot, Boot Camp, WSL's /mnt/c). None: the built-in SoundFont stands in.
+    /// Microsoft's file can't be shipped with BreezySRPG95.
     /// </summary>
-    public static string? WindowsGmDls => OperatingSystem.IsWindows()
-        && System.IO.Path.Combine(Environment.SystemDirectory, "drivers", "gm.dls") is var p && File.Exists(p) ? p : null;
+    public static string? GmDls(string gameRoot)
+    {
+        // looked for once a game (the options ask every frame)
+        if (_gmDls is { } known && known.Root == gameRoot) return known.Path;
+        _gmDls = (gameRoot, FindGmDls(gameRoot));
+        return _gmDls.Value.Path;
+    }
+
+    static (string Root, string? Path)? _gmDls;
+
+    static string? FindGmDls(string gameRoot)
+    {
+        if (OperatingSystem.IsWindows())
+            return System.IO.Path.Combine(Environment.SystemDirectory, "drivers", "gm.dls") is var p && File.Exists(p) ? p : null;
+        return Runtime.DlsSoundFont.FindGmDls(SoundFontFolders(gameRoot), MountedDrives());
+    }
+
+    /// <summary>Where other drives are mounted: /mnt, /media and /run/media (Linux), /Volumes (macOS).</summary>
+    static IEnumerable<string> MountedDrives()
+    {
+        static IEnumerable<string> Under(string dir)
+        {
+            try { return Directory.Exists(dir) ? Directory.GetDirectories(dir) : []; }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException) { return []; }
+        }
+        if (OperatingSystem.IsMacOS()) return Under("/Volumes");
+        // /mnt/c (WSL) and /mnt itself; /media/<user>/<drive>, /media/<drive>; /run/media/<user>/<drive>
+        return new[] { "/mnt" }.Concat(Under("/mnt")).Concat(Under("/media")).Concat(Under("/media").SelectMany(Under))
+            .Concat(Under("/run/media").SelectMany(Under));
+    }
 
     /// <summary>The SoundFont given with --soundfont (a full path), listed first wherever it lies.</summary>
     public static string? CommandLineSoundFont { get; set; }
@@ -269,11 +302,15 @@ public sealed class Settings
     /// <summary>Stands for the SoundFont embedded in the executable (GeneralUser GS).</summary>
     public const string BuiltIn = "GeneralUser GS (built-in)";
 
-    /// <summary>The chosen SoundFont: a file path, or <see cref="BuiltIn"/> (the default, and the fallback when a chosen file is gone).</summary>
+    /// <summary>
+    /// The chosen SoundFont: a file path, or <see cref="BuiltIn"/>. Unchosen (null), and when a chosen file is gone, gm.dls,
+    /// else the built-in one.
+    /// </summary>
     public string ResolveSoundFont(string gameRoot)
     {
-        if (SoundFont is null || SoundFont == BuiltIn) return BuiltIn;
-        if (File.Exists(SoundFont)) return SoundFont;
-        return FindSoundFonts(gameRoot).FirstOrDefault(f => System.IO.Path.GetFileName(f).Equals(SoundFont, StringComparison.OrdinalIgnoreCase)) ?? BuiltIn;
+        if (SoundFont == BuiltIn) return BuiltIn;
+        if (SoundFont is not null && File.Exists(SoundFont)) return SoundFont;
+        return (SoundFont is null ? null : FindSoundFonts(gameRoot).FirstOrDefault(f => System.IO.Path.GetFileName(f).Equals(SoundFont, StringComparison.OrdinalIgnoreCase)))
+            ?? GmDls(gameRoot) ?? BuiltIn;
     }
 }

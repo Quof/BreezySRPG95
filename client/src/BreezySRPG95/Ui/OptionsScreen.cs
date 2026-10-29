@@ -223,11 +223,14 @@ public sealed class OptionsScreen
 
     List<Row> AudioRows()
     {
-        var fonts = new List<string> { Settings.BuiltIn };
+        // gm.dls first (the default), then the built-in one, then the rest
+        var gm = Settings.GmDls(_gameRoot);
+        var fonts = new List<string>();
+        if (gm is not null) fonts.Add(gm);
+        fonts.Add(Settings.BuiltIn);
         fonts.AddRange(Settings.FindSoundFonts(_gameRoot));
         string FontName(string f) => f == Settings.BuiltIn ? T("GeneralUser GS (Built-In)", "GeneralUser GS（内蔵）")
-            : (string.Equals(f, Settings.WindowsGmDls, StringComparison.OrdinalIgnoreCase) ? T("Microsoft GS Wavetable (gm.dls)", "Microsoft GS Wavetable（gm.dls）")
-                : Path.GetFileName(f)) + (string.Equals(f, Audio.SoundFontFailed, StringComparison.OrdinalIgnoreCase) ? T(" (Can't Be Read)", "（読み込めません）") : "");
+            : (f == gm ? "Microsoft GS Wavetable (gm.dls)" : Path.GetFileName(f)) +(string.Equals(f, Audio.SoundFontFailed, StringComparison.OrdinalIgnoreCase) ? T(" (Can't Be Read)", "（読み込めません）") : "");
         return new()
         {
             new(T("BGM Volume", "BGMの音量"), () => "", d => _s.MusicVolume = Math.Clamp(_s.MusicVolume + 10 * d, 0, 100), Wheel: true,
@@ -239,12 +242,12 @@ public sealed class OptionsScreen
                 () => (int)_s.ConfirmSound, i => _s.ConfirmSound = (ConfirmSound)i),
             Gap(),
             // off Windows there is no Windows MIDI: the choice says so, and the SoundFont plays (Audio.SetSoundFont)
-            Choice(T("MIDI Playback", "MIDI再生"), () => new[] { OperatingSystem.IsWindows() ? T("Windows MIDI (Original)", "Windows MIDI（オリジナル）")
+            Choice(T("MIDI Playback", "MIDI再生"), () => new[] { OperatingSystem.IsWindows() ? "Windows MIDI"
                     : T("Windows MIDI (Windows Only)", "Windows MIDI（Windowsのみ）"), T("SoundFont", "サウンドフォント") },
                 () => (int)_s.Music, i => _s.Music = (MusicEngine)i),
             Choice(T("SoundFont", "サウンドフォント"), () => fonts.Select(FontName).ToArray(),
                 () => Math.Max(0, fonts.IndexOf(_s.ResolveSoundFont(_gameRoot))),
-                i => _s.SoundFont = fonts[i] == Settings.BuiltIn ? null : Path.GetFileName(fonts[i])),
+                i => _s.SoundFont = fonts[i] == gm ? null : fonts[i] == Settings.BuiltIn ? Settings.BuiltIn : Path.GetFileName(fonts[i])),
             Toggle(T("Loop at Loop Markers (SoundFont)", "ループ位置で繰り返す（サウンドフォント）"), () => _s.LoopMarkers, v => _s.LoopMarkers = v),
         };
     }

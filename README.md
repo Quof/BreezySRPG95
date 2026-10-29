@@ -20,8 +20,9 @@ From elsewhere: `BreezySRPG95.exe --game "C:\path\to\game folder"`
   exe or the game, then F1 > Audio > SoundFont; or start the exe with
   `--soundfont "C:\path\to\file.sf2"` to use one from anywhere.
 - Windows' own MIDI instruments (`gm.dls`, what the games were made with)
-  are found by themselves: F1 > Audio > SoundFont > Microsoft GS Wavetable.
-  Unlike Windows MIDI, they then loop at loop markers.
+  are found by themselves and are the default SoundFont (Microsoft GS
+  Wavetable). Unlike Windows MIDI, they loop at loop markers. GeneralUser
+  GS, built in, is the other choice under F1 > Audio > SoundFont.
 - The first start unpacks three DLLs to `%TEMP%\.net\BreezySRPG95`.
 
 Linux and macOS: see `README-LINUX.txt` / `README-MAC.txt` in those packages.

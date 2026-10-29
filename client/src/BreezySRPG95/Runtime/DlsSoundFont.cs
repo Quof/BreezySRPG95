@@ -1,5 +1,6 @@
 using System.Buffers.Binary;
 using System.Text;
+using Srpg95.Data;
 
 namespace BreezySRPG95.Runtime;
 
@@ -30,6 +31,17 @@ public static class DlsSoundFont
         }
         catch (IOException) { return false; }
         catch (UnauthorizedAccessException) { return false; }
+    }
+
+    /// <summary>
+    /// gm.dls in one of these folders, else in one of these drives' Windows\System32\drivers (names in any case), the
+    /// first that is a DLS collection.
+    /// </summary>
+    public static string? FindGmDls(IEnumerable<string> folders, IEnumerable<string> drives)
+    {
+        var copied = folders.Select(d => FileNames.In(d, "gm.dls"));
+        var mounted = drives.Select(root => new[] { "Windows", "System32", "drivers", "gm.dls" }.Aggregate(root, FileNames.In));
+        return copied.Concat(mounted).FirstOrDefault(f => File.Exists(f) && Is(f));
     }
 
     /// <summary>The DLS file as a SoundFont 2 file's bytes.</summary>
