@@ -244,8 +244,19 @@ public sealed class Settings
     public static List<string> FindSoundFonts(string gameRoot)
     {
         var dirs = new[] { FileNames.In(AppContext.BaseDirectory, "soundfonts"), FileNames.In(gameRoot, "soundfonts"), gameRoot };
-        return dirs.Where(Directory.Exists).SelectMany(d => Directory.GetFiles(d, "*.sf2", FileNames.AnyCase)).Distinct().ToList();
+        var found = dirs.Where(Directory.Exists).SelectMany(d => Directory.GetFiles(d, "*.sf2", FileNames.AnyCase));
+        if (CommandLineSoundFont is { } given && File.Exists(given)) found = found.Prepend(given);
+        return found.Distinct().ToList();
     }
+
+    /// <summary>The SoundFont given with --soundfont (a full path), listed first wherever it lies.</summary>
+    public static string? CommandLineSoundFont { get; set; }
+
+    /// <summary>
+    /// Whether the music goes through the SoundFont: as the option says on Windows, always elsewhere (there's no Windows
+    /// MIDI there, whatever a settings file brought from Windows says).
+    /// </summary>
+    [JsonIgnore] public bool UsesSoundFont => Music == MusicEngine.SoundFont || !OperatingSystem.IsWindows();
 
     /// <summary>Stands for the SoundFont embedded in the executable (GeneralUser GS).</summary>
     public const string BuiltIn = "GeneralUser GS (built-in)";

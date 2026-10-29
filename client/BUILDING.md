@@ -77,6 +77,7 @@ Options:
   ```
 - `--event NAME`: run this script on load instead of the first map's `OPENING`, e.g. `--map 4 --event EV000101` (object 1's first event slot). With `--advance -1 --choose random --fast 1 --screenshot` this runs any event of any map by itself.
 - `--load N`: load `SAVEn.DAT` at start (a camp save opens its camp).
+- `--soundfont FILE`: a SoundFont (`.sf2`) from anywhere, used for this run and listed first under Options > Audio > SoundFont (kept only if the options are then changed). One that can't be read is marked so there, and the music falls back to Windows MIDI, or off Windows to the built-in SoundFont.
 - `--saves DIR`: where `SAVEn.DAT` files are read and written. The default is the game folder, as in the original; point it elsewhere to keep the game folder untouched.
 - `--camp N` (developer): open the camp before map N.
 - `--level N` (developer): allies start the map at level N or higher, e.g. `--level 12` gives ルーティ her spells on map 1.

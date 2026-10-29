@@ -16,6 +16,9 @@ From elsewhere: `BreezySRPG95.exe --game "C:\path\to\game folder"`
 - Menus start in English on an English system, else Japanese.
   To change: F1 > Display (画面) > Language (言語).
 - Settings: `%APPDATA%\BreezySRPG95\settings.json` (shared by all games).
+- Your own SoundFont (`.sf2`): put it in a `soundfonts` folder next to the
+  exe or the game, then F1 > Audio > SoundFont; or start the exe with
+  `--soundfont "C:\path\to\file.sf2"` to use one from anywhere.
 - The first start unpacks three DLLs to `%TEMP%\.net\BreezySRPG95`.
 
 Linux and macOS: see `README-LINUX.txt` / `README-MAC.txt` in those packages.

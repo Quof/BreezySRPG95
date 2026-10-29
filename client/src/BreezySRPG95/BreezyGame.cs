@@ -129,6 +129,12 @@ public sealed class BreezyGame : Game
         _audio.Prepare();   // the sound device and the system sounds now, the rest read ahead
         Sfx.Audio = _audio;
         _settings = Settings.Load(persistent: _opts.Screenshot is null);
+        if (_opts.SoundFont is { } sf && File.Exists(sf))
+        {
+            // --soundfont: this run's SoundFont, whatever the settings say (saved only if the options are changed)
+            Settings.CommandLineSoundFont = sf;
+            (_settings.SoundFont, _settings.Music) = (sf, MusicEngine.SoundFont);
+        }
         _controls = new Controls(_settings);
         _backlog = new Ui.Backlog(_ui);
         ApplySettings();
@@ -408,7 +414,7 @@ public sealed class BreezyGame : Game
         _audio.MessageSound = _settings.ConfirmSound != ConfirmSound.Off;
         _audio.LoopAtMarkers = _settings.LoopMarkers;
         _audio.AdvanceSound = _settings.ConfirmSound == ConfirmSound.On;
-        _audio.SetSoundFont(_settings.Music == MusicEngine.SoundFont ? _settings.ResolveSoundFont(_folder.Root) : null);
+        _audio.SetSoundFont(_settings.UsesSoundFont ? _settings.ResolveSoundFont(_folder.Root) : null);
         ApplyGameplay();
         ApplyDisplay();
     }
@@ -1650,7 +1656,7 @@ public sealed class BreezyGame : Game
         if (_session is null || _runner is null) return "";
         string shown = _runner.Message is { } msg ? "message: " + string.Join(" / ", msg.Lines)
             : _runner.Choice is { } ch ? $"choice {_runner.ChoiceIndex}: {string.Join(" / ", ch)}" : "message: none";
-        return $"{shown}\nface {_runner.Message?.Face} brightness {_fx.Brightness} tone {_fx.Tone} pictures [{string.Join(",", _fx.Pictures.Select(p => p.File))}] bgm {_audio.CurrentBgm}{(_audio.BgmMp3 is { } mp3 ? $" (MP3_File/{mp3})" : "")} camera {_session.Camera}\n"
+        return $"{shown}\nface {_runner.Message?.Face} brightness {_fx.Brightness} tone {_fx.Tone} pictures [{string.Join(",", _fx.Pictures.Select(p => p.File))}] bgm {_audio.CurrentBgm}{(_audio.BgmMp3 is { } mp3 ? $" (MP3_File/{mp3})" : "")} soundfont {Path.GetFileName(_audio.SoundFont ?? "-")}{(Runtime.Audio.SoundFontFailed is { } bad ? $" (unreadable: {Path.GetFileName(bad)})" : "")} camera {_session.Camera}\n"
             + $"gold {_state.Gold} items {string.Join(",", _state.Items.Select(kv => $"{kv.Key}x{kv.Value}"))} switches {string.Join(",", Enumerable.Range(0, GameState.SwitchCount).Where(i => _state.Switches[i]))} "
             + $"variables {string.Join(",", Enumerable.Range(0, GameState.VariableCount).Where(i => _state.Variables[i] != 0).Select(i => $"{i}={_state.Variables[i]}"))}\n";
     }

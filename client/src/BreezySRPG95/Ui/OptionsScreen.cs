@@ -225,7 +225,8 @@ public sealed class OptionsScreen
     {
         var fonts = new List<string> { Settings.BuiltIn };
         fonts.AddRange(Settings.FindSoundFonts(_gameRoot));
-        string FontName(string f) => f == Settings.BuiltIn ? T("GeneralUser GS (Built-In)", "GeneralUser GS（内蔵）") : Path.GetFileName(f);
+        string FontName(string f) => f == Settings.BuiltIn ? T("GeneralUser GS (Built-In)", "GeneralUser GS（内蔵）")
+            : Path.GetFileName(f) + (string.Equals(f, Audio.SoundFontFailed, StringComparison.OrdinalIgnoreCase) ? T(" (Can't Be Read)", "（読み込めません）") : "");
         return new()
         {
             new(T("BGM Volume", "BGMの音量"), () => "", d => _s.MusicVolume = Math.Clamp(_s.MusicVolume + 10 * d, 0, 100), Wheel: true,

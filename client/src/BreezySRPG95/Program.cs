@@ -101,6 +101,7 @@ static unsafe class ErrorBox
 ///               --give "ID:N,.."      (developer: add N of ITEM.DAT item ID (0-based) to the inventory)
 ///               --place "UNIT:X.Y,.."  (developer: move a unit (UNIT.DAT id) to a tile and keep it shown; :X.Y.HP also sets HP)
 ///               --saves DIR            (where SAVEn.DAT files are read and written; default: the game folder)
+///               --soundfont FILE       (a SoundFont (.sf2) anywhere, chosen for this run and listed in the options)
 ///               --load N               (load SAVEn.DAT from the game folder at start)
 ///               --camp N               (developer: open the camp before map N, 1-based)
 ///               --choose "a,b,.."     (with --screenshot: the option each character choice takes in turn, 0-based or
@@ -115,11 +116,11 @@ static unsafe class ErrorBox
 ///                                       endturn ends the player's turn (ターン終了);
 ///                                       otherwise the shot is taken once the queue is done and the map is idle)
 /// </summary>
-public sealed record Options(string GameDir, string? RtpDir, int? StartMap, string? Screenshot, int Advance, string? Event, string? Keys = null, int? Level = null, string? Give = null, string? Place = null, int? LoadSlot = null, int? CampBefore = null, string? SaveDir = null, string? Choose = null, int Scale = 1, bool Fast = false, int Frames = 30000)
+public sealed record Options(string GameDir, string? RtpDir, int? StartMap, string? Screenshot, int Advance, string? Event, string? Keys = null, int? Level = null, string? Give = null, string? Place = null, int? LoadSlot = null, int? CampBefore = null, string? SaveDir = null, string? Choose = null, int Scale = 1, bool Fast = false, int Frames = 30000, string? SoundFont = null)
 {
     public static Options Parse(string[] args)
     {
-        string? game = null, rtp = null, shot = null, ev = null, keys = null, give = null, place = null, saves = null, choose = null;
+        string? game = null, rtp = null, shot = null, ev = null, keys = null, give = null, place = null, saves = null, choose = null, soundFont = null;
         int? level = null, loadSlot = null, campBefore = null;
         int? map = null;
         int advance = 0, scale = 1, frames = 30000;
@@ -145,12 +146,13 @@ public sealed record Options(string GameDir, string? RtpDir, int? StartMap, stri
                 case "--scale": scale = int.Parse(args[i + 1]); break;
                 case "--fast": fast = args[i + 1] != "0"; break;
                 case "--frames": frames = int.Parse(args[i + 1]); break;
+                case "--soundfont": soundFont = Path.GetFullPath(args[i + 1]); break;
             }
         }
         game ??= FindGameFolder() ?? throw new NoGameException();
         if (!Directory.Exists(game)) throw new NoGameException();
         rtp ??= FindUp(AppContext.BaseDirectory, Path.Combine("srpg maker 95", "RTP"));
-        return new Options(game, rtp, map, shot, advance, ev, keys, level, give, place, loadSlot, campBefore, saves, choose, scale, fast, frames);
+        return new Options(game, rtp, map, shot, advance, ev, keys, level, give, place, loadSlot, campBefore, saves, choose, scale, fast, frames, soundFont);
     }
 
     /// <summary>

@@ -50,6 +50,10 @@ public sealed class Audio(GameFolder game) : IDisposable
     MidiFileSequencer? _sequencer;
     DynamicSoundEffectInstance? _stream;
     string? _soundFont;
+
+    /// <summary>The SoundFont the music plays through (a path or Settings.BuiltIn), or none (Windows MIDI).</summary>
+    public string? SoundFont => _soundFont;
+
     readonly float[] _left = new float[Block], _right = new float[Block];
     readonly byte[] _pcm = new byte[Block * 4];
 
@@ -58,6 +62,10 @@ public sealed class Audio(GameFolder game) : IDisposable
     /// executable, or null for Windows MIDI. Restarts the current track with it. Off Windows, which has no MCI, null and
     /// an unreadable file mean the built-in one.
     /// </summary>
+    /// <summary>The last SoundFont that couldn't be read, and why (none since).</summary>
+    public static string? SoundFontFailed { get; private set; }
+    public static string? SoundFontError { get; private set; }
+
     public void SetSoundFont(string? path)
     {
         if (!HasMci) path ??= Config.Settings.BuiltIn;
@@ -79,7 +87,12 @@ public sealed class Audio(GameFolder game) : IDisposable
                 else _synth = new Synthesizer(path, Rate);
                 _sequencer = new MidiFileSequencer(_synth);
             }
-            catch (Exception) { _synth = null; _sequencer = null; _soundFont = null; }   // unreadable SoundFont: Windows MIDI
+            catch (Exception e)
+            {
+                // unreadable SoundFont: Windows MIDI, or off Windows the built-in one; the options say it couldn't be read
+                (_synth, _sequencer, _soundFont) = (null, null, null);
+                if (path != Config.Settings.BuiltIn) (SoundFontFailed, SoundFontError) = (path, e.Message);
+            }
             if (_synth is null && !HasMci && path != Config.Settings.BuiltIn) { SetSoundFont(Config.Settings.BuiltIn); return; }
         }
         var current = CurrentBgm;
