@@ -58,7 +58,7 @@ public sealed class Audio(GameFolder game) : IDisposable
     readonly byte[] _pcm = new byte[Block * 4];
 
     /// <summary>
-    /// Use this SoundFont for MIDI: a .sf2 path, <see cref="Config.Settings.BuiltIn"/> for the one embedded in the
+    /// Use this SoundFont for MIDI: a .sf2 or .dls (<see cref="DlsSoundFont"/>) path, <see cref="Config.Settings.BuiltIn"/> for the one embedded in the
     /// executable, or null for Windows MIDI. Restarts the current track with it. Off Windows, which has no MCI, null and
     /// an unreadable file mean the built-in one.
     /// </summary>
@@ -82,6 +82,11 @@ public sealed class Audio(GameFolder game) : IDisposable
                 {
                     using var s = typeof(Audio).Assembly.GetManifestResourceStream("GeneralUser-GS.sf2")
                         ?? throw new FileNotFoundException("built-in SoundFont missing");
+                    _synth = new Synthesizer(new SoundFont(s), Rate);
+                }
+                else if (DlsSoundFont.Is(path))
+                {
+                    using var s = DlsSoundFont.ToSoundFont(path);
                     _synth = new Synthesizer(new SoundFont(s), Rate);
                 }
                 else _synth = new Synthesizer(path, Rate);

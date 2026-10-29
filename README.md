@@ -19,6 +19,9 @@ From elsewhere: `BreezySRPG95.exe --game "C:\path\to\game folder"`
 - Your own SoundFont (`.sf2`): put it in a `soundfonts` folder next to the
   exe or the game, then F1 > Audio > SoundFont; or start the exe with
   `--soundfont "C:\path\to\file.sf2"` to use one from anywhere.
+- Windows' own MIDI instruments (`gm.dls`, what the games were made with)
+  are found by themselves: F1 > Audio > SoundFont > Microsoft GS Wavetable.
+  Unlike Windows MIDI, they then loop at loop markers.
 - The first start unpacks three DLLs to `%TEMP%\.net\BreezySRPG95`.
 
 Linux and macOS: see `README-LINUX.txt` / `README-MAC.txt` in those packages.

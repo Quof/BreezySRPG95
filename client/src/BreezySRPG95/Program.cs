@@ -101,7 +101,7 @@ static unsafe class ErrorBox
 ///               --give "ID:N,.."      (developer: add N of ITEM.DAT item ID (0-based) to the inventory)
 ///               --place "UNIT:X.Y,.."  (developer: move a unit (UNIT.DAT id) to a tile and keep it shown; :X.Y.HP also sets HP)
 ///               --saves DIR            (where SAVEn.DAT files are read and written; default: the game folder)
-///               --soundfont FILE       (a SoundFont (.sf2) anywhere, chosen for this run and listed in the options)
+///               --soundfont FILE       (a SoundFont (.sf2, or .dls like gm.dls) anywhere, chosen for this run and listed in the options)
 ///               --load N               (load SAVEn.DAT from the game folder at start)
 ///               --camp N               (developer: open the camp before map N, 1-based)
 ///               --choose "a,b,.."     (with --screenshot: the option each character choice takes in turn, 0-based or

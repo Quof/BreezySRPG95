@@ -238,16 +238,24 @@ public sealed class Settings
     }
 
     /// <summary>
-    /// SoundFonts the player can choose: *.sf2 in soundfonts/ next to the executable and in the game folder (the folder's
-    /// name and the files' extension in any case, off Windows too).
+    /// SoundFonts the player can choose: *.sf2 and *.dls in soundfonts/ next to the executable and in the game folder (the
+    /// folder's name and the files' extension in any case, off Windows too), then Windows' own gm.dls (<see cref="WindowsGmDls"/>).
     /// </summary>
     public static List<string> FindSoundFonts(string gameRoot)
     {
         var dirs = new[] { FileNames.In(AppContext.BaseDirectory, "soundfonts"), FileNames.In(gameRoot, "soundfonts"), gameRoot };
-        var found = dirs.Where(Directory.Exists).SelectMany(d => Directory.GetFiles(d, "*.sf2", FileNames.AnyCase));
+        var found = dirs.Where(Directory.Exists).SelectMany(d => new[] { "*.sf2", "*.dls" }.SelectMany(p => Directory.GetFiles(d, p, FileNames.AnyCase)));
         if (CommandLineSoundFont is { } given && File.Exists(given)) found = found.Prepend(given);
-        return found.Distinct().ToList();
+        if (WindowsGmDls is { } gm) found = found.Append(gm);
+        return found.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
     }
+
+    /// <summary>
+    /// The Microsoft GS Wavetable synth's instruments (System32\drivers\gm.dls), what the games were made with, when this is
+    /// Windows and has them.
+    /// </summary>
+    public static string? WindowsGmDls => OperatingSystem.IsWindows()
+        && System.IO.Path.Combine(Environment.SystemDirectory, "drivers", "gm.dls") is var p && File.Exists(p) ? p : null;
 
     /// <summary>The SoundFont given with --soundfont (a full path), listed first wherever it lies.</summary>
     public static string? CommandLineSoundFont { get; set; }
