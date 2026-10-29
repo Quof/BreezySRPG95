@@ -66,7 +66,7 @@ Change them under F1 > Controls.
 | Arrow keys | cursor |
 | W A S D | scroll the map |
 | C / Left Shift | unit status |
-| Tab / Left Ctrl (hold) | fast-forward |
+| Tab / Ctrl (hold) | fast-forward |
 | Space | skip the cutscene |
 | Wheel up / L | text backlog (Up / Down scroll it) |
 | R | every enemy's range |

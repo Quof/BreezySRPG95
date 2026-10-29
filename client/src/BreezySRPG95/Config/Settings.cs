@@ -107,7 +107,7 @@ public sealed class Settings
         [GameAction.CameraDown] = new() { Microsoft.Xna.Framework.Input.Keys.S },
         [GameAction.CameraLeft] = new() { Microsoft.Xna.Framework.Input.Keys.A },
         [GameAction.CameraRight] = new() { Microsoft.Xna.Framework.Input.Keys.D },
-        [GameAction.FastForward] = new() { Microsoft.Xna.Framework.Input.Keys.Tab, Microsoft.Xna.Framework.Input.Keys.LeftControl },
+        [GameAction.FastForward] = new() { Microsoft.Xna.Framework.Input.Keys.Tab, Microsoft.Xna.Framework.Input.Keys.LeftControl, Microsoft.Xna.Framework.Input.Keys.RightControl },
         [GameAction.Backlog] = new() { Microsoft.Xna.Framework.Input.Keys.L },
         [GameAction.Options] = new() { Microsoft.Xna.Framework.Input.Keys.F1 },
         [GameAction.Fullscreen] = new() { Microsoft.Xna.Framework.Input.Keys.F4 },

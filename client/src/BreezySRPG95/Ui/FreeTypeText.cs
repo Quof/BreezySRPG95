@@ -11,8 +11,9 @@ namespace BreezySRPG95.Ui;
 /// The interface's text through FreeType: on Linux and macOS (on Windows only with BREEZY_TEXT=freetype, GdiText being the
 /// default there). The same styles, sizes and layout as <see cref="GdiText"/>, from the fonts inside the executable alone:
 /// IPAGothic in the place of the original's MS Gothic (Windows' own, not to be carried), Noto Sans JP and Noto Serif JP at
-/// the weights GDI picks by name (their variable fonts' named instances), the pixel fonts dot for dot; BIZ UDPGothic, Yu
-/// Gothic UI and MS Gothic, Windows' fonts, aren't there and fall back to Noto Sans JP. GDI's own numbers are followed:
+/// the weights GDI picks by name (their variable fonts' named instances), the pixel fonts dot for dot; MS Gothic, BIZ
+/// UDPGothic and Yu Gothic UI, Windows' fonts, where the system has them installed (<see cref="SystemFonts"/>; MS Gothic
+/// then comes out identical to GDI's), else IPAGothic for MS Gothic and Noto Sans JP for the others. GDI's own numbers are followed:
 /// a face's line is round(winAscent × px / em) + round(winDescent × px / em) (as GDI gives for every font carried, at
 /// 2–120 px), a string's width its glyphs' rounded advances, GDI's simulated bold (the original's 700 weight) one pixel
 /// wider a character, drawn twice a pixel apart; the restyled skins centre on Yu Gothic UI as GDI measures it
@@ -47,7 +48,7 @@ public sealed class FreeTypeText : ITextFont
         Height = height;
         _strong = weight >= 700;
         FreeTypeFonts.Init();   // fails here, not at the first string, if FreeType can't be loaded
-        FaceName = FreeTypeFonts.Has(FreeTypeFonts.IpaGothic) ? "IPAGothic" : "Noto Sans JP";
+        FaceName = SystemFonts.MsGothic is not null ? "MS Gothic" : FreeTypeFonts.Has(FreeTypeFonts.IpaGothic) ? "IPAGothic" : "Noto Sans JP";
     }
 
     // ---------------- faces, as GdiText chooses them ----------------
@@ -55,6 +56,8 @@ public sealed class FreeTypeText : ITextFont
     /// <summary>A restyled font's file, weight and size against the original's pixel height (GdiText.Spec's carried fonts).</summary>
     (string File, int Weight, float Size) Spec(UiFont f) => f switch
     {
+        UiFont.BizUd when SystemFonts.BizUd(_strong) is { } biz => (biz, 0, 0.84f),
+        UiFont.YuGothic when SystemFonts.YuGothic(_strong) is { } yu => (yu, 0, 1f),
         UiFont.NotoSerif when FreeTypeFonts.Has(FreeTypeFonts.NotoSerif) => (FreeTypeFonts.NotoSerif, _strong ? 600 : 500, 0.9f),
         _ when FreeTypeFonts.Has(FreeTypeFonts.NotoSans) => (FreeTypeFonts.NotoSans, _strong ? 500 : 400, 0.9f),
         _ => (FreeTypeFonts.IpaGothic, 0, 1f),   // nothing else carried: IPAGothic, smoothed
@@ -63,7 +66,7 @@ public sealed class FreeTypeText : ITextFont
     /// <summary>A pixel font's file and the size its dots were made for, for a text of <paramref name="height"/> px (GdiText.Pixel).</summary>
     static (string File, int Px)? Pixel(UiFont f, int height) => (f, height >= 16) switch
     {
-        (UiFont.MsGothic, _) => (FreeTypeFonts.IpaGothic, height),   // MS Gothic's stand-in, dot for dot at the text's height
+        (UiFont.MsGothic, _) => (SystemFonts.MsGothic ?? FreeTypeFonts.IpaGothic, height),   // the system's MS Gothic, else its stand-in; dot for dot
         (UiFont.PixelDot, true) => (FreeTypeFonts.DotGothic16, 16),
         (UiFont.PixelDot, false) => (FreeTypeFonts.PixelMplus12, 12),
         (UiFont.KhDot, true) => (FreeTypeFonts.KhDot16, 16),
@@ -76,7 +79,9 @@ public sealed class FreeTypeText : ITextFont
     {
         UiFont.NotoSans => FreeTypeFonts.Has(FreeTypeFonts.NotoSans),
         UiFont.NotoSerif => FreeTypeFonts.Has(FreeTypeFonts.NotoSerif),
-        UiFont.MsGothic => FreeTypeFonts.Has(FreeTypeFonts.IpaGothic),
+        UiFont.MsGothic => SystemFonts.MsGothic is not null || FreeTypeFonts.Has(FreeTypeFonts.IpaGothic),
+        UiFont.BizUd => SystemFonts.BizUd(false) is not null,
+        UiFont.YuGothic => SystemFonts.YuGothic(false) is not null,
         UiFont.PixelDot or UiFont.KhDot => Pixel(f, 12) is { } small && Pixel(f, 16) is { } large
             && FreeTypeFonts.Has(small.File) && FreeTypeFonts.Has(large.File),
         _ => false,
@@ -91,9 +96,9 @@ public sealed class FreeTypeText : ITextFont
         return s;
     }
 
-    /// <summary>The original skin's face, in MS Gothic's place: IPAGothic, else (a build without it) Noto Sans JP.</summary>
-    (string File, int Weight) OriginalFace() => FreeTypeFonts.Has(FreeTypeFonts.IpaGothic)
-        ? (FreeTypeFonts.IpaGothic, 0) : (FreeTypeFonts.NotoSans, _strong ? 500 : 400);
+    /// <summary>The original skin's face: the system's MS Gothic, else IPAGothic in its place, else (a build without it) Noto Sans JP.</summary>
+    (string File, int Weight) OriginalFace() => SystemFonts.MsGothic is { } ms ? (ms, 0)
+        : FreeTypeFonts.Has(FreeTypeFonts.IpaGothic) ? (FreeTypeFonts.IpaGothic, 0) : (FreeTypeFonts.NotoSans, _strong ? 500 : 400);
 
     Style Make(bool restyled, UiFont font, int k)
     {
@@ -193,8 +198,11 @@ static unsafe class FreeTypeFonts
         KhDot12 = "fonts/KH-Dot-Kodenmachou-12.ttf", KhDot16 = "fonts/KH-Dot-Kodenmachou-16.ttf",
         IpaGothic = "freetype/ipag.ttf";   // not under fonts/: GDI isn't given it on Windows
 
-    /// <summary>A font file's bytes (in native memory, for the process's life: FreeType reads them where they lie) and metrics.</summary>
-    sealed record FontFile(IntPtr Data, int Length, int UnitsPerEm, int WinAscent, int WinDescent, int[] InstanceWeights);
+    /// <summary>
+    /// A font file's bytes (in native memory, for the process's life: FreeType reads them where they lie) and metrics; for
+    /// a collection (.ttc), the face of it that's meant (<see cref="CollectionIndex"/>, FreeType's face index's lower half).
+    /// </summary>
+    sealed record FontFile(IntPtr Data, int Length, int UnitsPerEm, int WinAscent, int WinDescent, int[] InstanceWeights, int CollectionIndex = 0);
 
     static FT_LibraryRec_* _lib;
     static readonly Dictionary<string, FontFile?> Files = new();
@@ -223,17 +231,31 @@ static unsafe class FreeTypeFonts
     static FontFile? File(string resource)
     {
         if (Files.TryGetValue(resource, out var f)) return f;
-        using var s = typeof(FreeTypeFonts).Assembly.GetManifestResourceStream(resource);
-        if (s is null) return Files[resource] = null;
-        var b = new byte[s.Length];
-        s.ReadExactly(b);
-        var t = Tables(b);
+        byte[] b;
+        int index = 0;
+        if (SystemFonts.Parse(resource) is var (path, face))
+        {
+            // a font of the system's (SystemFonts): its file on the disk
+            try { b = System.IO.File.ReadAllBytes(path); }
+            catch (Exception) { return Files[resource] = null; }
+            index = face;
+        }
+        else
+        {
+            using var s = typeof(FreeTypeFonts).Assembly.GetManifestResourceStream(resource);
+            if (s is null) return Files[resource] = null;
+            b = new byte[s.Length];
+            s.ReadExactly(b);
+        }
+        // a collection: the face's own table directory, from the header's list of them
+        int at = b.Length > 16 && Encoding.ASCII.GetString(b, 0, 4) == "ttcf" && index < S32(b, 8) ? S32(b, 12 + 4 * index) : 0;
+        var t = Tables(b, at);
         int upm = U16(b, t["head"] + 18);
         int winA = t.TryGetValue("OS/2", out int os2) ? U16(b, os2 + 74) : (short)U16(b, t["hhea"] + 4);
         int winD = t.ContainsKey("OS/2") ? U16(b, os2 + 76) : -(short)U16(b, t["hhea"] + 6);
         var p = (IntPtr)NativeMemory.Alloc((nuint)b.Length);
         Marshal.Copy(b, 0, p, b.Length);
-        return Files[resource] = new FontFile(p, b.Length, upm, winA, winD, InstanceWeights(b, t));
+        return Files[resource] = new FontFile(p, b.Length, upm, winA, winD, InstanceWeights(b, t), index);
     }
 
     /// <summary>A variable font's named instances' weights, in order (instance i + 1 is the face index's upper half); none for a static font.</summary>
@@ -287,7 +309,7 @@ static unsafe class FreeTypeFonts
         var f = File(resource) ?? throw new FileNotFoundException("font not in the executable", resource);
         int instance = Instance(f, weight);
         FT_FaceRec_* face;
-        var e = FT_New_Memory_Face(_lib, (byte*)f.Data, f.Length, instance << 16, &face);
+        var e = FT_New_Memory_Face(_lib, (byte*)f.Data, f.Length, (instance << 16) | f.CollectionIndex, &face);
         if (e != FT_Error.FT_Err_Ok) throw new InvalidOperationException($"FreeType couldn't open {resource}: {e}");
         e = FT_Set_Pixel_Sizes(face, 0, (uint)px);
         if (e != FT_Error.FT_Err_Ok) throw new InvalidOperationException($"FreeType couldn't size {resource} at {px} px: {e}");
@@ -393,11 +415,79 @@ static unsafe class FreeTypeFonts
     static int U16(byte[] b, int o) => (b[o] << 8) | b[o + 1];
     static int S32(byte[] b, int o) => (b[o] << 24) | (b[o + 1] << 16) | (b[o + 2] << 8) | b[o + 3];
 
-    static Dictionary<string, int> Tables(byte[] b)
+    /// <summary>A font's tables by tag, from its table directory at <paramref name="at"/> (0, or a collection's face's).</summary>
+    static Dictionary<string, int> Tables(byte[] b, int at = 0)
     {
         var d = new Dictionary<string, int>();
-        for (int i = 0, n = U16(b, 4); i < n; i++)
-            d[Encoding.ASCII.GetString(b, 12 + 16 * i, 4)] = S32(b, 12 + 16 * i + 8);
+        for (int i = 0, n = U16(b, at + 4); i < n; i++)
+            d[Encoding.ASCII.GetString(b, at + 12 + 16 * i, 4)] = S32(b, at + 12 + 16 * i + 8);
         return d;
+    }
+}
+
+/// <summary>
+/// Windows' own fonts where the system has them installed (fonts copied from Windows, or a font package): MS Gothic for
+/// the original's text, BIZ UDPGothic and Yu Gothic UI for the Font option, found with fontconfig (fc-match) the first
+/// time they're asked for — none where fontconfig isn't there or finds only another family. A font is named by a key,
+/// "system:" + its file + "#" + its face in a collection, that <see cref="FreeTypeFonts"/> reads from the disk.
+/// BREEZY_SYSTEM_FONTS ("family[:style]=file#face;...") stands in for fontconfig, for testing on a system without it.
+/// </summary>
+static class SystemFonts
+{
+    const string Prefix = "system:";
+    static readonly Dictionary<string, string?> Found = new();
+
+    public static string? MsGothic => Find("MS Gothic", "ＭＳ ゴシック");
+    public static string? BizUd(bool bold) => Find(bold ? "BIZ UDPGothic:bold" : "BIZ UDPGothic", "BIZ UDPゴシック");
+    public static string? YuGothic(bool bold) => Find(bold ? "Yu Gothic UI:demibold" : "Yu Gothic UI");
+
+    /// <summary>A key's file and face, or null for a font inside the executable.</summary>
+    public static (string Path, int Face)? Parse(string key)
+    {
+        if (!key.StartsWith(Prefix, StringComparison.Ordinal)) return null;
+        int hash = key.LastIndexOf('#');
+        return hash > Prefix.Length && int.TryParse(key[(hash + 1)..], out int face) ? (key[Prefix.Length..hash], face) : (key[Prefix.Length..], 0);
+    }
+
+    /// <summary>The installed font of the pattern's family (or one of its other names), as a key; null when there's none.</summary>
+    static string? Find(string pattern, params string[] otherNames)
+    {
+        if (Found.TryGetValue(pattern, out var key)) return key;
+        string family = pattern.Split(':')[0];
+        var names = otherNames.Prepend(family).ToArray();
+        return Found[pattern] = Override(pattern, names) ?? FcMatch(pattern, names);
+    }
+
+    /// <summary>BREEZY_SYSTEM_FONTS's file for the pattern itself ("BIZ UDPGothic:bold=..."), else for its family's names.</summary>
+    static string? Override(string pattern, string[] names)
+    {
+        if (Environment.GetEnvironmentVariable("BREEZY_SYSTEM_FONTS") is not { } list) return null;
+        var entries = list.Split(';', StringSplitOptions.RemoveEmptyEntries).Select(e => e.Split('=', 2)).Where(e => e.Length == 2)
+            .Select(e => (Name: e[0].Trim(), File: e[1].Trim())).ToList();
+        var hit = entries.FirstOrDefault(e => e.Name.Equals(pattern, StringComparison.OrdinalIgnoreCase));
+        if (hit.File is null) hit = entries.FirstOrDefault(e => names.Contains(e.Name, StringComparer.OrdinalIgnoreCase));
+        return hit.File is null ? null : Prefix + hit.File;
+    }
+
+    /// <summary>fc-match's best font for the pattern, if its family is the one asked for (fc-match always answers with something).</summary>
+    static string? FcMatch(string pattern, string[] names)
+    {
+        if (OperatingSystem.IsWindows()) return null;   // Windows' fonts go through GDI; BREEZY_TEXT=freetype tests use the override
+        try
+        {
+            var start = new System.Diagnostics.ProcessStartInfo("fc-match")
+            {
+                RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false, CreateNoWindow = true,
+            };
+            foreach (var a in new[] { "--format=%{file}\n%{index}\n%{family}\n", pattern }) start.ArgumentList.Add(a);
+            using var p = System.Diagnostics.Process.Start(start);
+            if (p is null) return null;
+            string[] lines = p.StandardOutput.ReadToEnd().Split('\n');
+            if (!p.WaitForExit(3000) || p.ExitCode != 0 || lines.Length < 3) return null;
+            var families = lines[2].Split(',').Select(n => n.Trim());
+            if (!families.Any(n => names.Contains(n, StringComparer.OrdinalIgnoreCase)) || !File.Exists(lines[0])) return null;
+            return $"{Prefix}{lines[0]}#{(int.TryParse(lines[1], out int face) ? face : 0)}";
+        }
+        catch (Exception) { return null; }   // no fontconfig
     }
 }
