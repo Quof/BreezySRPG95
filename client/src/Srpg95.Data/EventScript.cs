@@ -30,15 +30,18 @@ public sealed record Command(Op Op, int Depth, byte[] Payload)
 /// <summary>A node of the script tree.</summary>
 public abstract record ScriptNode;
 public sealed record CommandNode(Command Command) : ScriptNode;
-/// <summary>Message (op 01) with its continuation lines (op C9) merged.</summary>
-public sealed record MessageNode(int Window, List<string> Lines) : ScriptNode;
+/// <summary>Message (op 01) with its continuation lines (op C9) merged; <paramref name="At"/> is the op 01's command number.</summary>
+public sealed record MessageNode(int Window, List<string> Lines, int At = -1) : ScriptNode;
 public sealed record BranchNode(Command Condition, List<ScriptNode> Then) : ScriptNode;
-public sealed record ChoiceNode(Command Choice, string[] Options, List<List<ScriptNode>> Cases) : ScriptNode;
+/// <param name="At">the character choice's command number</param>
+public sealed record ChoiceNode(Command Choice, string[] Options, List<List<ScriptNode>> Cases, int At = -1) : ScriptNode;
 
 public sealed class EventScript
 {
     public required string Name { get; init; }
     public required string Comment { get; init; }
+    /// <summary>The map file the script is in ("SMAP_001"), set by <see cref="MapData.Load"/>; translations go by it.</summary>
+    public string Map { get; set; } = "";
     public required List<Command> Commands { get; init; }
     public required List<ScriptNode> Tree { get; init; }
     /// <summary>Non-null if the file is structurally invalid (no shipped script is).</summary>
@@ -113,7 +116,7 @@ public static class TreeBuilder
                 var c = cmds[pos];
                 if (c.Op is Op.EndBlock or Op.EndBranch or Op.ChoiceCase or Op.EndChoice) return list;
                 if (c.Depth != depth) Fail($"command {pos} ({c.Op}) at depth {c.Depth}, expected {depth}");
-                pos++;
+                int at = pos++;
                 bool wasAfterMessage = afterMessage;
                 afterMessage = c.Op is Op.Message or Op.MessageLine;
                 switch (c.Op)
@@ -121,7 +124,7 @@ public static class TreeBuilder
                     case Op.EndOfScript:
                         break;
                     case Op.Message:
-                        list.Add(new MessageNode(c.Window, new List<string> { c.Text }));
+                        list.Add(new MessageNode(c.Window, new List<string> { c.Text }, at));
                         break;
                     case Op.MessageLine:
                         // FUN_0040d18c takes up to four more lines straight after a message (five in all); a line past
@@ -143,7 +146,7 @@ public static class TreeBuilder
                             Expect(Op.EndBlock, depth + 1);
                         }
                         Expect(Op.EndChoice, depth);
-                        list.Add(new ChoiceNode(c, c.ChoiceOptions, cases));
+                        list.Add(new ChoiceNode(c, c.ChoiceOptions, cases, at));
                         break;
                     default:
                         list.Add(new CommandNode(c));

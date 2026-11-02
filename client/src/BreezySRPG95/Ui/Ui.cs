@@ -75,6 +75,8 @@ public sealed class Ui : IDisposable
     public ITextFont NameText { get; }
     /// <summary>The restyled skins' 14-px bold (the status window's class, which the original draws twice a pixel apart).</summary>
     public ITextFont BoldText { get; }
+    /// <summary>Message text a size down, for a translated message too long for five lines (<see cref="FitMessage"/>).</summary>
+    public ITextFont CompactText { get; }
 
     public Ui(GraphicsDevice device, Textures tex)
     {
@@ -86,6 +88,7 @@ public sealed class Ui : IDisposable
         NameText = TextFonts.Create(device, 16, 700, "BREEZY_FONT");
         Pad = new PadGlyphs(device);
         BoldText = TextFonts.Create(device, 14, 700, "BREEZY_BOLDFONT");
+        CompactText = TextFonts.Create(device, 14, 700, "BREEZY_FONT");
         _pixel = new Texture2D(device, 1, 1);
         _pixel.SetData(new[] { Color.White });
     }
@@ -384,11 +387,12 @@ public sealed class Ui : IDisposable
     /// A message's speaker — its first line when that is just 「name：」 (or what <see cref="NameTags"/> says), as nearly
     /// every message in the game starts — and the rest. A label for a condition (勝利条件：, 敗北条件：, ボーナス条件：,
     /// 終了条件： …) is written the same way but is no one speaking: in all five games every such first line with 条件 in
-    /// it is one, so it stays in the text.
+    /// it is one, so it stays in the text (and in a translation one saying "condition").
     /// </summary>
     public static (string? Name, IReadOnlyList<string> Text) SplitSpeaker(IReadOnlyList<string> lines)
     {
-        if (lines.Count > 0 && lines[0].Trim() is { Length: > 0 } first && !first.Contains("条件"))
+        if (lines.Count > 0 && lines[0].Trim() is { Length: > 0 } first && !first.Contains("条件")
+            && !first.Contains("condition", StringComparison.OrdinalIgnoreCase))   // a translation's ("Victory condition:")
             foreach (var (before, after, next) in _nameTags)
                 if ((next.Length == 0 || lines.Count > 1 && lines[1].TrimStart().StartsWith(next, StringComparison.Ordinal))
                     && first.Length > before.Length + after.Length && first.StartsWith(before, StringComparison.Ordinal) && first.EndsWith(after, StringComparison.Ordinal)
@@ -408,8 +412,10 @@ public sealed class Ui : IDisposable
     /// (<see cref="TextWidth"/>): never wider than before, narrower on the side away from the face, centred without one.
     /// </summary>
     public void Message(SpriteBatch sb, Texture2D? face, int windowY, bool faceRight, bool faceFlip, IReadOnlyList<string> lines,
-        bool tailLeft = false)
+        bool tailLeft = false, bool small = false)
     {
+        var font = small ? CompactText : Text;
+        int lineHeight = small ? CompactLineHeight : LineHeight;
         if (face is not null)
             sb.Draw(face, new Rectangle(faceRight ? 480 : 32, windowY + 16, 128, 128), null, Color.White, 0, Vector2.Zero,
                 faceFlip ? SpriteEffects.FlipHorizontally : SpriteEffects.None, 0);
@@ -420,12 +426,12 @@ public sealed class Ui : IDisposable
             // so the text is level either way
             var (who, said) = SplitSpeaker(lines);
             int mx = left ? 192 : right ? 32 : 112, bottom = windowY + 143;
-            int bw = Math.Min(BalloonWidth - 2, 17 + TextWidth(said) + 17);
+            int bw = Math.Min(BalloonWidth - 2, 17 + TextWidth(said, font) + 17);
             int bx = left ? mx + 1 : right ? mx + BalloonWidth - 1 - bw : 320 - bw / 2;
             // the text box from 28 px below the area's top (room for the name box above it); lines that don't fit grow it
             // downwards, its top and the name box staying put — up only as far as it would leave the screen
             int top = windowY + 16 + 28;
-            bottom = Math.Max(bottom, top + 11 + said.Count * LineHeight + 9);
+            bottom = Math.Max(bottom, top + 11 + said.Count * lineHeight + 9);
             if (bottom > 476) (top, bottom) = (top - (bottom - 476), 476);
             if (who is not null)
             {
@@ -435,18 +441,18 @@ public sealed class Ui : IDisposable
                 if (NameText.Get(who) is { } t) ShadowText(sb, NameText, who, new Vector2(nr.X + (w - t.Width) / 2, nr.Y + (nr.Height - t.LayoutHeight) / 2), Color.White);
             }
             ModernBox(sb, new Rectangle(bx, top, bw, bottom - top), ModernBase, 12, 0.92f);
-            for (int i = 0; i < said.Count; i++) DrawText(sb, said[i], new Vector2(bx + 17, top + 11 + i * LineHeight), TextColor);
+            for (int i = 0; i < said.Count; i++) font.Get(said[i])?.Draw(sb, new Vector2(bx + 17, top + 11 + i * lineHeight), TextColor);
             return;
         }
         if (!Gilded)
         {
             int bx = left ? 192 : right ? 32 : 112;
             MessageBalloon(sb, new Point(bx, windowY + 16), left ? -1 : right ? 1 : 0);
-            for (int i = 0; i < lines.Count; i++) DrawText(sb, lines[i], new Vector2(bx + 18, windowY + 28 + i * LineHeight), TextColor);
+            for (int i = 0; i < lines.Count; i++) font.Get(lines[i])?.Draw(sb, new Vector2(bx + 18, windowY + 28 + i * lineHeight), TextColor);
             return;
         }
         var (name, text) = SplitSpeaker(lines);
-        int x0 = left ? 172 : 24, x1 = right ? 468 : 616, need = 20 + TextWidth(text) + 20;
+        int x0 = left ? 172 : 24, x1 = right ? 468 : 616, need = 20 + TextWidth(text, font) + 20;
         if (x1 - x0 > need)
         {
             if (left) x1 = x0 + need;
@@ -457,7 +463,7 @@ public sealed class Ui : IDisposable
         GildedBox(sb, box, GildedNavy, 0.84f, left ? -1 : right ? 1 : 0, windowY + 80 - box.Y);
         if (name is not null) NameBox(sb, name, box.X + 14, box.Y - 13);
         int ty = box.Y + (name is null && text.Count > 4 ? 14 : 20);   // level with or without a name box (five lines need the room)
-        for (int i = 0; i < text.Count; i++) ShadowText(sb, Text, text[i], new Vector2(box.X + 20, ty + i * LineHeight), TextColor);
+        for (int i = 0; i < text.Count; i++) ShadowText(sb, font, text[i], new Vector2(box.X + 20, ty + i * lineHeight), TextColor);
     }
 
     public void DrawText(SpriteBatch sb, string s, Vector2 pos, Color c) => Text.Get(s)?.Draw(sb, pos, c);
@@ -469,7 +475,53 @@ public sealed class Ui : IDisposable
     /// How wide a message's text is to be taken in the restyled skins: a full line in the font chosen — a kanji, the
     /// widest full-width glyph, 20 times — or this message's widest line, should a game have longer ones.
     /// </summary>
-    int TextWidth(IReadOnlyList<string> lines) => Math.Max(Text.Measure(FullLine), lines.Count == 0 ? 0 : lines.Max(Text.Measure));
+    int TextWidth(IReadOnlyList<string> lines, ITextFont font) => Math.Max(Text.Measure(FullLine), lines.Count == 0 ? 0 : lines.Max(font.Measure));
+
+    /// <summary>The compact text's line spacing, and how many of its lines a message window holds (the name line included).</summary>
+    public const int CompactLineHeight = 18, CompactLines = 6;
+
+    /// <summary>
+    /// A translated message laid out to fit (modern): its lines wrapped at the width of a full line of the game's (20
+    /// full-width characters), between words where it has spaces. Five lines or fewer stay as they are; up to
+    /// <see cref="CompactLines"/> in the compact text (wrapped again, it fits more on a line) are shown in that; longer
+    /// ones go on over more windows, five lines each, a click apart, each starting with the speaker's line.
+    /// </summary>
+    public List<(IReadOnlyList<string> Lines, bool Small)> FitMessage(IReadOnlyList<string> lines)
+    {
+        var (name, text) = SplitSpeaker(lines);
+        var head = name is null ? new List<string>() : new List<string> { lines[0] };
+        // the modern skin shows the speaker in a box of its own and grows the text's to fit; the others count its line
+        int taken = Modern ? 0 : head.Count;
+        int width = Text.Measure(FullLine);
+        var wrapped = Wrap(text, Text, width);
+        if (taken + wrapped.Count <= TreeBuilder.MaxMessageLines) return new() { (head.Concat(wrapped).ToList(), false) };
+        var compact = Wrap(text, CompactText, width);
+        if (taken + compact.Count <= CompactLines) return new() { (head.Concat(compact).ToList(), true) };
+        int per = TreeBuilder.MaxMessageLines - taken;
+        return wrapped.Chunk(per).Select(c => ((IReadOnlyList<string>)head.Concat(c).ToList(), false)).ToList();
+    }
+
+    /// <summary>Lines no wider than <paramref name="width"/>: broken at the last space that fits, else where the width runs out.</summary>
+    static List<string> Wrap(IReadOnlyList<string> lines, ITextFont font, int width)
+    {
+        var result = new List<string>();
+        foreach (var line in lines)
+        {
+            string rest = line.TrimEnd();
+            if (rest.Length == 0) { result.Add(""); continue; }
+            while (rest.Length > 0)
+            {
+                if (font.Measure(rest) <= width) { result.Add(rest); break; }
+                int fit = 1;
+                while (fit < rest.Length && font.Measure(rest[..(fit + 1)]) <= width) fit++;
+                int space = rest.LastIndexOf(' ', fit);
+                int cut = space > 0 ? space : fit;
+                result.Add(rest[..cut].TrimEnd());
+                rest = rest[cut..].TrimStart();
+            }
+        }
+        return result;
+    }
 
     /// <summary>
     /// Screen frame from SFRAME_H/V.BMP: 16-px strips around the 608x448 map viewport, copied opaque over the tiles
@@ -615,6 +667,7 @@ public sealed class Ui : IDisposable
         Text.Dispose();
         SmallText.Dispose();
         NameText.Dispose();
+        CompactText.Dispose();
         BoldText.Dispose();
         MenuFont?.Dispose();
         _pixel.Dispose();

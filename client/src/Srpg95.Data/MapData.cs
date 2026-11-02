@@ -68,7 +68,12 @@ public sealed class MapData
     public required MapObject[] Objects { get; init; }
     public required Dictionary<string, EventScript> Scripts { get; init; }
 
-    public static MapData Load(string path) => Parse(File.ReadAllBytes(path));
+    public static MapData Load(string path)
+    {
+        var map = Parse(File.ReadAllBytes(path));
+        foreach (var s in map.Scripts.Values) s.Map = Path.GetFileNameWithoutExtension(path).ToUpperInvariant();
+        return map;
+    }
 
     /// <summary>
     /// Reads the parts in the order the runtime's map loader does (FUN_004048ac): the 0x4b0-byte header, the tiles —

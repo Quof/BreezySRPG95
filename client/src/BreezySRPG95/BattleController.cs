@@ -545,6 +545,11 @@ public sealed class BattleController
 
     string Word(int i) => i >= 0 && i < _db.Words.Length ? _db.Words[i] : "";
 
+    /// <summary>A line the original puts together from WORD.DAT's pieces (Ui.Lang.Phrase).</summary>
+    static string Phrase(params string[] parts) => Ui.Lang.Phrase(parts);
+
+    static string T(string en, string ja) => Ui.Lang.T(en, ja);
+
     // ---------------- events (FORMAT_NOTES §16: FUN_0040c24c and the triggers around it) ----------------
     //
     // One event at a time, as the original runs them: when one ends, the checkpoint looks again from the top, so what
@@ -1516,7 +1521,7 @@ public sealed class BattleController
             user.Level = 1;
             int Keep(int item) { if (item >= 0 && !UnitChanges.Usable(_db.Items[item], to)) { _state.AddItem(item, 1); return -1; } return item; }
             (user.Weapon, user.Armor, user.Accessory) = (Keep(user.Weapon), Keep(user.Armor), Keep(user.Accessory));
-            lines.Add($"{_db.Classes[to].Name}{Word(72)}");   // 「に昇格」
+            lines.Add(Phrase(_db.Classes[to].Name, Word(72)));   // 「に昇格」
             int[] words = { 8, 9, 10, 11 };                    // 攻撃補正値 特殊補正値 命中回避値 耐久力
             for (int k = 0; k < 4; k++)
                 if (StatLine(words[k], user.Base[2 + k] - before[2 + k]) is { } s) lines.Add(s);
@@ -1536,7 +1541,7 @@ public sealed class BattleController
     {
         _state.AddItem(it.Index, -1);
         var r = _s.Field.UseMedicine(user, it, target);
-        string Points(int word, int v, int verb) => $"{Word(word)}{Word(64)}{Wide(v)}{Word(65)}{Word(verb)}";
+        string Points(int word, int v, int verb) => Phrase(Word(word), Word(64), Wide(v), Word(65), Word(verb));
         ShowPanel(r.Effects.Select(e => e.Kind switch
         {
             EffectKind.Heal => Points(2, e.Amount, 66),
@@ -1545,8 +1550,8 @@ public sealed class BattleController
             EffectKind.MdefUp => Points(7, e.Amount, 67),
             EffectKind.CurePoison => Word(74),
             EffectKind.WakeUp => Word(76),
-            EffectKind.AttackRestored => $"{Word(4)}{Word(64)}{Word(66)}",
-            EffectKind.DefenseRestored => $"{Word(6)}{Word(64)}{Word(66)}",
+            EffectKind.AttackRestored => Phrase(Word(4), Word(64), Word(66)),
+            EffectKind.DefenseRestored => Phrase(Word(6), Word(64), Word(66)),
             _ => "",
         }).Where(s => s.Length > 0), 160, 20);
         _after = null;
@@ -1620,12 +1625,13 @@ public sealed class BattleController
         {
             var n = e.Target.Name;
             // the client's own wording, in the style of the original's medicine messages
-            string Points(string what, int v, int verb) => $"{what}{Word(64)}{Wide(v)}{Word(65)}{Word(verb)}";
+            string Points(string what, int v, int verb) => Ui.Lang.Japanese ? $"{what}{Word(64)}{Wide(v)}{Word(65)}{Word(verb)}"
+                : $"{n}: {what} {(verb == 69 ? "-" : "+")}{v}";
             Popup(e.Kind switch
             {
-                EffectKind.Damage => $"{actor.Name} → {n}：{e.Amount}{(e.Killed ? "　撃破" : "")}",
-                EffectKind.Miss => $"{actor.Name} → {n}：ミス",
-                EffectKind.Resisted => $"{n}：無効",
+                EffectKind.Damage => T($"{actor.Name} → {n}: {e.Amount}{(e.Killed ? "  Defeated" : "")}", $"{actor.Name} → {n}：{e.Amount}{(e.Killed ? "　撃破" : "")}"),
+                EffectKind.Miss => T($"{actor.Name} → {n}: Miss", $"{actor.Name} → {n}：ミス"),
+                EffectKind.Resisted => T($"{n}: No effect", $"{n}：無効"),
                 EffectKind.Heal => Points(Word(2), e.Amount, 66),
                 EffectKind.MpHeal => Points(Word(3), e.Amount, 66),
                 EffectKind.PowerUp => Points(Word(4), e.Amount, 67),
@@ -1633,25 +1639,28 @@ public sealed class BattleController
                 EffectKind.MdefUp => Points(Word(7), e.Amount, 67),
                 EffectKind.AttackDown => Points(Word(4), e.Amount, 69),
                 EffectKind.DefenseDown => Points(Word(6), e.Amount, 69),
-                EffectKind.Poison => $"{n}は毒を受けた",
-                EffectKind.Sleep => $"{n}は眠った",
-                EffectKind.CurePoison => $"{n}の{Word(74)}",                                   // "毒が消えた"
-                EffectKind.WakeUp => $"{n}は{Word(76)}",                                       // "目を覚ました"
-                EffectKind.Cleanse => $"{n}の状態異常が回復した",
-                EffectKind.AttackRestored => $"{Word(4)}{Word(64)}{Word(66)}",
-                EffectKind.DefenseRestored => $"{Word(6)}{Word(64)}{Word(66)}",
-                _ => $"{n}は再行動できる",
+                EffectKind.Poison => T($"{n} was poisoned", $"{n}は毒を受けた"),
+                EffectKind.Sleep => T($"{n} fell asleep", $"{n}は眠った"),
+                EffectKind.CurePoison => T($"{n}'s poison was cured", $"{n}の{Word(74)}"),   // "毒が消えた"
+                EffectKind.WakeUp => T($"{n} woke up", $"{n}は{Word(76)}"),                    // "目を覚ました"
+                EffectKind.Cleanse => T($"{n} recovered from status effects", $"{n}の状態異常が回復した"),
+                EffectKind.AttackRestored => T($"{n}: {Word(4)} restored", $"{Word(4)}{Word(64)}{Word(66)}"),
+                EffectKind.DefenseRestored => T($"{n}: {Word(6)} restored", $"{Word(6)}{Word(64)}{Word(66)}"),
+                _ => T($"{n} can act again", $"{n}は再行動できる"),
             }, e.Killed ? e.Target : null);
             if (e.Killed) _s.Ghosts.Add(e.Target);
         }
     }
 
-    /// <summary>Numbers as the original's messages print them (FUN_004051a0): full-width digits and minus sign.</summary>
-    static string Wide(int v) => string.Concat(v.ToString().Select(c => c is >= '0' and <= '9' ? (char)('０' + (c - '0')) : c == '-' ? '－' : c));
+    /// <summary>
+    /// Numbers as the original's messages print them (FUN_004051a0): full-width digits and minus sign — plain ones in a
+    /// translated game's.
+    /// </summary>
+    static string Wide(int v) => Ui.Lang.GameTranslated ? v.ToString() : string.Concat(v.ToString().Select(c => c is >= '0' and <= '9' ? (char)('０' + (c - '0')) : c == '-' ? '－' : c));
 
     /// <summary>「〜がｎポイント上昇した / 下降した」 (FUN_0040b800); nothing for 0.</summary>
     string? StatLine(int word, int change) =>
-        change == 0 ? null : $"{Word(word)}{Word(64)}{Wide(change)}{Word(65)}{Word(change > 0 ? 68 : 69)}";
+        change == 0 ? null : Phrase(Word(word), Word(64), Wide(change), Word(65), Word(change > 0 ? 68 : 69));
 
     /// <summary>
     /// After a fight or a spell (FUN_0041093c): for a player unit that gained EXP and lives, the rewards panel at
@@ -1664,18 +1673,18 @@ public sealed class BattleController
         foreach (var (u, exp) in r.ExpGained)
         {
             if (u.Dead) continue;
-            var lines = new List<string> { $"{Wide(exp)}{Word(60)}" };
-            if (r.RewardGold > 0) lines.Add($"{Wide(r.RewardGold)}{Word(61)}");
-            lines.AddRange(r.RewardItems.Where(it => it >= 0 && it < _db.Items.Length).Select(it => $"{_db.Items[it].Name}{Word(62)}"));
+            var lines = new List<string> { Phrase(Wide(exp), Word(60)) };
+            if (r.RewardGold > 0) lines.Add(Phrase(Wide(r.RewardGold), Word(61)));
+            lines.AddRange(r.RewardItems.Where(it => it >= 0 && it < _db.Items.Length).Select(it => Phrase(_db.Items[it].Name, Word(62))));
             ShowPanel(lines, 200, 20);
             _state.Gold = Math.Min(9_999_999, _state.Gold + r.RewardGold);
             foreach (var item in r.RewardItems) _state.AddItem(item, 1);
             if (!r.LevelUps.TryGetValue(u, out var up)) continue;
-            var lv = new List<string> { $"{u.Name}{Word(70)}{Wide(u.Level)}{Word(71)}" };
+            var lv = new List<string> { Phrase(u.Name, Word(70), Wide(u.Level), Word(71)) };
             int[] words = { 2, 3, 8, 9, 10, 11 };   // ＨＰ ＴＰ 攻撃補正値 特殊補正値 命中回避値 耐久力
             for (int k = 0; k < 6; k++)
                 if (up[k] > 0 && StatLine(words[k], up[k]) is { } s) lv.Add(s);
-            if (r.Learned.TryGetValue(u, out var spells)) lv.AddRange(spells.Select(m => $"{m.Name}{Word(73)}"));
+            if (r.Learned.TryGetValue(u, out var spells)) lv.AddRange(spells.Select(m => Phrase(m.Name, Word(73))));
             ShowPanel(lv, 140, 30, Sfx.LevelUp);
         }
     }
@@ -1792,9 +1801,9 @@ public sealed class BattleController
         var ter = _s.Field.TerrainAt(_cursor.X, _cursor.Y);
         // signed from the point of view of a unit standing there: 地形効果 +20% = attacks on it 20% less likely to hit
         string Signed(int v) => v > 0 ? $"+{v}" : $"{v}";
-        var lines = new List<(string Label, string Value)> { (Word(75), $"{Signed(ter.DefenseBonus)}%") };
-        if (ter.DefenseBonus / 10 != 0) lines.Add(("被ダメージ", Signed(-(ter.DefenseBonus / 10))));
-        if (ter.HpRecovery != 0) lines.Add(("HP回復", $"{ter.HpRecovery}"));
+        var lines = new List<(string Label, string Value)> { (Ui.Lang.T("Avoid", Word(75)), $"{Signed(ter.DefenseBonus)}%") };
+        if (ter.DefenseBonus / 10 != 0) lines.Add((Ui.Lang.T("Damage taken", "被ダメージ"), Signed(-(ter.DefenseBonus / 10))));
+        if (ter.HpRecovery != 0) lines.Add((Ui.Lang.T("HP regen", "HP回復"), $"{ter.HpRecovery}"));
         // the move cost of entering the tile: the selected unit's (its class's own cost for the terrain, if it has one),
         // else each move type's — walking, flying, special; × where it can't go
         string Cost(int c) => c <= 0 ? "×" : $"{c}";
@@ -1841,10 +1850,10 @@ public sealed class BattleController
         ForecastPanel(sb, def, atk, new ForecastRow[]
         {
             new(Word(2), $"{def.Hp} → {defAfter}", $"{atk.Hp} → {atkAfter}"),
-            new("威力", Strikes(fd), Strikes(fa), LeftUp: WeaknessAid && fd.Strikes > 0 && _s.Field.WeaponEffective(def, atk),
+            new(T("Dmg", "威力"), Strikes(fd), Strikes(fa), LeftUp: WeaknessAid && fd.Strikes > 0 && _s.Field.WeaponEffective(def, atk),
                 RightUp: WeaknessAid && fa.Strikes > 0 && _s.Field.WeaponEffective(atk, def)),
-            new("命中", Pct(fd.Hit, fd), Pct(fa.Hit, fa)),
-            new("必殺", Pct(fd.Crit, fd), Pct(fa.Crit, fa)),
+            new(T("Hit", "命中"), Pct(fd.Hit, fd), Pct(fa.Hit, fa)),
+            new(T("Crit", "必殺"), Pct(fd.Crit, fd), Pct(fa.Crit, fa)),
         });
     }
 
@@ -1861,11 +1870,11 @@ public sealed class BattleController
         string effect = kind switch
         {
             EffectKind.Damage => $"{amount}", EffectKind.Heal => $"{amount}",
-            EffectKind.Poison => "毒", EffectKind.Sleep => "睡眠",
-            EffectKind.AttackDown => $"{Word(4)}－{amount}", EffectKind.DefenseDown => $"{Word(6)}－{amount}",
-            EffectKind.PowerUp => $"{Word(4)}＋{amount}", EffectKind.DefUp => $"{Word(6)}＋{amount}",
-            EffectKind.CurePoison => "解毒", EffectKind.Cleanse => "状態回復", EffectKind.ExtraTurn => "再行動",
-            _ => "無効",
+            EffectKind.Poison => T("Poison", "毒"), EffectKind.Sleep => T("Sleep", "睡眠"),
+            EffectKind.AttackDown => T($"Atk -{amount}", $"{Word(4)}－{amount}"), EffectKind.DefenseDown => T($"Def -{amount}", $"{Word(6)}－{amount}"),
+            EffectKind.PowerUp => T($"Atk +{amount}", $"{Word(4)}＋{amount}"), EffectKind.DefUp => T($"Def +{amount}", $"{Word(6)}＋{amount}"),
+            EffectKind.CurePoison => T("Cure", "解毒"), EffectKind.Cleanse => T("Cleanse", "状態回復"), EffectKind.ExtraTurn => T("Act Again", "再行動"),
+            _ => T("None", "無効"),
         };
         int mpAfter = fromItem ? caster.Mp : Math.Max(0, caster.Mp - m.MpCost);
         bool self = t == caster;
@@ -1874,9 +1883,9 @@ public sealed class BattleController
         {
             new(Word(2), hp, self ? hp : $"{caster.Hp}"),
             new(Word(3), self ? mp : $"{t.Mp}", mp),
-            new(kind == EffectKind.Heal ? "回復" : kind == EffectKind.Damage ? "威力" : "効果", "－", effect,
+            new(kind == EffectKind.Heal ? T("Heal", "回復") : kind == EffectKind.Damage ? T("Dmg", "威力") : T("Effect", "効果"), "－", effect,
                 RightUp: WeaknessAid && kind == EffectKind.Damage && _s.Field.SpellEffective(m, t)),
-            new("命中", "－", kind == EffectKind.Resisted ? "－" : $"{hit}%"),
+            new(T("Hit", "命中"), "－", kind == EffectKind.Resisted ? "－" : $"{hit}%"),
         }, count);
     }
 
@@ -2080,8 +2089,9 @@ public sealed class BattleController
                 _s.Field.ApplyStrike(st);
                 if (Quiet) continue;
                 Popup(st.Hit
-                    ? $"{st.Attacker.Name} → {st.Target.Name}：{st.Damage}{(st.Critical ? "（会心）" : "")}{(st.Killed ? "　撃破" : "")}"
-                    : $"{st.Attacker.Name} → {st.Target.Name}：ミス", st.Killed ? st.Target : null);
+                    ? T($"{st.Attacker.Name} → {st.Target.Name}: {st.Damage}{(st.Critical ? " (Critical)" : "")}{(st.Killed ? "  Defeated" : "")}",
+                        $"{st.Attacker.Name} → {st.Target.Name}：{st.Damage}{(st.Critical ? "（会心）" : "")}{(st.Killed ? "　撃破" : "")}")
+                    : T($"{st.Attacker.Name} → {st.Target.Name}: Miss", $"{st.Attacker.Name} → {st.Target.Name}：ミス"), st.Killed ? st.Target : null);
                 if (st.Killed) _s.Ghosts.Add(st.Target);
             }
             PhaseMusic();   // no scene shown (an option): the music the original's would leave

@@ -29,10 +29,12 @@ public sealed record PictureSave(string File, int Position, bool Transparent);
 /// <summary>
 /// An event's progress (<see cref="EventRunner"/>): its script, and its stack of blocks from the script's top level
 /// up, each as [which block, the next command in it] — a block being a branch's body (−1) or a choice's case (its
-/// number) of the command before the next one in the block below.
+/// number) of the command before the next one in the block below. <paramref name="Pages"/>: a translated message's windows
+/// still to come, a character choice after the last of them if <paramref name="ChoiceAfterPages"/>.
 /// </summary>
 public sealed record RunnerSave(string Script, List<int[]> Frames, int Face, bool FaceRight, bool FaceFlip,
-    MessageView? Message, MessageView? LastMessage, bool Choice, int ChoiceIndex, double WaitMs, bool WaitButton);
+    MessageView? Message, MessageView? LastMessage, bool Choice, int ChoiceIndex, double WaitMs, bool WaitButton,
+    List<MessageView>? Pages = null, bool ChoiceAfterPages = false);
 
 /// <summary>
 /// What the map does once the event is over, and what of the map a battle save has no room for (<see

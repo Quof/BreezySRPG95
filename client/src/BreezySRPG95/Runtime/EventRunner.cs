@@ -8,7 +8,8 @@ public enum EventEnd { None, EndEvent, MapWon, MapLost, GameOver, ReturnToTitle 
 public readonly record struct EventInput(bool Confirm, bool Cancel, bool Up, bool Down, bool FastForward);
 
 /// <summary>What the message window should show right now.</summary>
-public sealed record MessageView(int Window, IReadOnlyList<string> Lines, int Face, bool FaceRight, bool FaceFlip);
+/// <param name="Small">in the compact text (a long translated message, Ui.FitMessage)</param>
+public sealed record MessageView(int Window, IReadOnlyList<string> Lines, int Face, bool FaceRight, bool FaceFlip, bool Small = false);
 
 /// <summary>
 /// Runs one event script tree (FORMAT_NOTES §11.3 for the command semantics).
@@ -56,6 +57,17 @@ public sealed class EventRunner
 
     ChoiceNode? _choiceNode;
     int _messageAge;
+    EventScript? _script;
+
+    /// <summary>A message's translation (modern, Srpg95.Data.Translation), or null for the game's words.</summary>
+    public Func<EventScript, MessageNode, IReadOnlyList<string>?>? TranslateMessage { get; set; }
+    /// <summary>A character choice's options translated, or null.</summary>
+    public Func<EventScript, ChoiceNode, string[]?>? TranslateChoice { get; set; }
+    /// <summary>A translated message laid out in windows (Ui.FitMessage): the first shows, the rest follow a click apart.</summary>
+    public Func<IReadOnlyList<string>, List<(IReadOnlyList<string> Lines, bool Small)>>? Fit { get; set; }
+    /// <summary>The windows of the message shown still to come, and whether a character choice comes after the last.</summary>
+    readonly Queue<MessageView> _pages = new();
+    bool _choiceAfterPages;
 
     public EventRunner(GameState state, IMapContext map, Audio audio, ScreenEffects fx)
         => (_state, _map, _audio, _fx) = (state, map, audio, fx);
@@ -63,6 +75,9 @@ public sealed class EventRunner
     public void Start(EventScript script)
     {
         _stack.Clear();
+        _script = script;
+        _pages.Clear();
+        _choiceAfterPages = false;
         Name = script.Name;
         End = EventEnd.None;
         Message = null;
@@ -99,6 +114,8 @@ public sealed class EventRunner
     void SkipBlocks()
     {
         Message = LastMessage = null;
+        _pages.Clear();
+        _choiceAfterPages = false;
         _waitMs = 0;
         _waitButton = false;
         if (_waitPan) { _map.FinishPan(); _waitPan = false; }   // the view where the scroll was taking it
@@ -141,7 +158,8 @@ public sealed class EventRunner
             }
             saved.Add(new[] { block, frames[k].Pc });
         }
-        return new RunnerSave(Name, saved, _face, _faceRight, _faceFlip, Message, LastMessage, Choice is not null, ChoiceIndex, Math.Max(0, _waitMs), _waitButton);
+        return new RunnerSave(Name, saved, _face, _faceRight, _faceFlip, Message, LastMessage, Choice is not null, ChoiceIndex, Math.Max(0, _waitMs), _waitButton,
+            _pages.Count > 0 ? _pages.ToList() : null, _choiceAfterPages);
     }
 
     /// <summary>Puts the event back where <paramref name="s"/> left it; false (and nothing running) when the script doesn't have that place.</summary>
@@ -181,10 +199,12 @@ public sealed class EventRunner
             var (top, next) = _stack.Peek();
             if (next < 1 || top[next - 1] is not ChoiceNode c) return Fail();
             _choiceNode = c;
-            Choice = c.Options;
+            Choice = Options(c);
             ChoiceIndex = Math.Clamp(s.ChoiceIndex, 0, Math.Max(0, c.Options.Length - 1));
         }
         (_waitMs, _waitButton) = (Math.Max(0, s.WaitMs), s.WaitButton);
+        foreach (var p in s.Pages ?? new()) _pages.Enqueue(p);
+        _choiceAfterPages = s.ChoiceAfterPages && _pages.Count > 0;
         _waitFx = _waitMoves = _waitPan = _skipping = false;
         _titleMs = 0;
         _messageAge = 0;
@@ -214,8 +234,18 @@ public sealed class EventRunner
             if (input.Confirm) Sfx.MessageAdvance();
             // a message clicked away takes its window with it (FUN_0040d18c clears +0x5e18); only one a choice follows
             // straight away stays up under it
-            if (input.Confirm || auto) Message = LastMessage = null;
-            else return;
+            if (!input.Confirm && !auto) return;
+            Message = LastMessage = null;
+            if (_pages.TryDequeue(out var page))
+            {
+                // the message's next window; its last stays up under a character choice that follows
+                Message = LastMessage = page;
+                Shown?.Invoke(page);
+                _messageAge = 0;
+                if (_pages.Count > 0 || !_choiceAfterPages) return;
+                _choiceAfterPages = false;
+                Message = null;
+            }
         }
         if (Choice is not null)
         {
@@ -252,7 +282,11 @@ public sealed class EventRunner
             _stack.Push((nodes, pc + 1));
             if (!Execute(nodes[pc])) continue;
             // a message right before a character choice stays up under it: the choice comes at once (FUN_0040d18c)
-            if (nodes[pc] is MessageNode && pc + 1 < nodes.Count && nodes[pc + 1] is ChoiceNode) { Message = null; continue; }
+            if (nodes[pc] is MessageNode && pc + 1 < nodes.Count && nodes[pc + 1] is ChoiceNode)
+            {
+                if (_pages.Count == 0) { Message = null; continue; }
+                _choiceAfterPages = true;   // a message over several windows: the choice after the last
+            }
             if (_titleMs > 0) return;
             if (_skipping && Choice is null) { SkipBlocks(); continue; }
             _skipping = false;
@@ -275,7 +309,14 @@ public sealed class EventRunner
         switch (node)
         {
             case MessageNode m:
-                Message = LastMessage = new MessageView(m.Window, m.Lines, _face, _faceRight, _faceFlip);
+                _pages.Clear();
+                if (_script is not null && TranslateMessage?.Invoke(_script, m) is { } translated)
+                {
+                    var windows = Fit?.Invoke(translated) ?? new() { (translated, false) };
+                    foreach (var (lines, small) in windows.Skip(1)) _pages.Enqueue(new MessageView(m.Window, lines, _face, _faceRight, _faceFlip, small));
+                    Message = LastMessage = new MessageView(m.Window, windows[0].Lines, _face, _faceRight, _faceFlip, windows[0].Small);
+                }
+                else Message = LastMessage = new MessageView(m.Window, m.Lines, _face, _faceRight, _faceFlip);
                 Shown?.Invoke(Message);
                 _messageAge = 0;
                 return true;
@@ -286,7 +327,7 @@ public sealed class EventRunner
                 return false;
             case ChoiceNode c:
                 _choiceNode = c;
-                Choice = c.Options;
+                Choice = Options(c);
                 ChoiceIndex = 0;
                 return true;
             case CommandNode { Command: var cmd }:
@@ -294,6 +335,8 @@ public sealed class EventRunner
         }
         return false;
     }
+
+    string[] Options(ChoiceNode c) => _script is not null && TranslateChoice?.Invoke(_script, c) is { } t ? t : c.Options;
 
     /// <summary>The commands <see cref="Run"/> carries out (messages, branches and choices are tree nodes).</summary>
     public static readonly HashSet<Op> Handled = new()

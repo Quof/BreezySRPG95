@@ -55,6 +55,9 @@ public sealed class BreezyGame : Game
     Action? _afterFade;
     MapSession? _session;
     EventRunner? _runner;
+    /// <summary>The game's translation (translation/en), if it has one, and whether it's shown (the English language setting).</summary>
+    Translation? _translation;
+    bool? _translated;
     BattleController? _battle;
     Camp.CampScreen? _camp;
     TitleScreen? _title;
@@ -119,6 +122,7 @@ public sealed class BreezyGame : Game
     {
         _folder.ReadAhead("BMP");   // the pictures into memory in the background
         _db = Database.Load(_folder);
+        LoadTranslation();
         if (_db.Words.Length > 63) Camp.MenuList.PageLabel = _db.Words[63];   // ページ
         _tex = new Textures(GraphicsDevice, _folder) { Missing = f => ReportMissing("BMP/" + f) };
         _ui = new Ui.Ui(GraphicsDevice, _tex);
@@ -351,7 +355,13 @@ public sealed class BreezyGame : Game
             WarpMouse(new Point(320, 256));
         }
         _session = new MapSession(map, _db, _state, _tex, _folder.Chipset(map.Tileset));
-        _runner = new EventRunner(_state, _session, _audio, _fx) { Shown = _backlog.Add };
+        _runner = new EventRunner(_state, _session, _audio, _fx)
+        {
+            Shown = _backlog.Add,
+            TranslateMessage = (s, m) => _translated == true ? _translation?.Message(s, m) : null,
+            TranslateChoice = (s, c) => _translated == true ? _translation?.Choice(s, c) : null,
+            Fit = _ui.FitMessage,
+        };
         if (_opts.Screenshot is not null) (_session.Field.Rng, _runner.Rng) = (new Random(1), new Random(1));   // reproducible scripted runs: fights and events
         _battle = new BattleController(_session, _runner, _state, _db, _ui, _tex, _fx) { MusicLooped = () => _audio.BgmLooped, ShowThreat = _showThreat };
         // the exe stops the music when a map loads (FUN_0041d5e4 plays ""), except that a camp's music carries on into
@@ -403,9 +413,82 @@ public sealed class BreezyGame : Game
 
     /// <summary>The options; in a game (not on the title) with タイトルへ戻る and ゲーム終了, each fading out first as the title's choices do.</summary>
     void OpenOptions() => _options = _title is not null
-        ? new Ui.OptionsScreen(_settings, _ui, _folder.Root, ApplySettings, yesNo: Ui.Lang.YesNo(_db))
+        ? new Ui.OptionsScreen(_settings, _ui, _folder.Root, ApplySettings, yesNo: Ui.Lang.YesNo(_db)) { Dump = DumpTexts, GameTranslated = _translation is not null }
         : new Ui.OptionsScreen(_settings, _ui, _folder.Root, ApplySettings,
-            toTitle: () => AfterFade(10, OpenTitle), quit: () => AfterFade(10, Exit), yesNo: Ui.Lang.YesNo(_db));
+            toTitle: () => AfterFade(10, OpenTitle), quit: () => AfterFade(10, Exit), yesNo: Ui.Lang.YesNo(_db)) { Dump = DumpTexts, GameTranslated = _translation is not null };
+
+    // ---------------- translation (modern) ----------------
+
+    string TranslationRoot => Path.Combine(_folder.Root, "translation");
+
+    /// <summary>
+    /// The game's translation, translation/en, if it has one; checked against the game in the background, what doesn't fit
+    /// written to translation/en/PROBLEMS.txt (taken away when nothing is wrong).
+    /// </summary>
+    void LoadTranslation()
+    {
+        string dir = Path.Combine(TranslationRoot, "en");
+        _translation = Translation.Load(dir);
+        if (_translation is null || _opts.Screenshot is not null && Environment.GetEnvironmentVariable("BREEZY_CHECK_TRANSLATION") is null) return;
+        var (root, rtp) = (_folder.Root, _folder.RtpRoot);
+        Task.Run(() =>
+        {
+            string report = Path.Combine(dir, "PROBLEMS.txt");
+            List<string> problems;
+            try
+            {
+                var g = new GameFolder(root, rtp);
+                problems = Translation.Load(dir)?.Check(g, Database.Load(g)) ?? new();
+            }
+            catch (Exception e) { problems = new() { $"The check stopped: {e.Message}" }; }
+            try
+            {
+                if (problems.Count == 0) { if (File.Exists(report)) File.Delete(report); }
+                else File.WriteAllText(report, TranslationGuide.ProblemsHeader + string.Join("\n", problems) + "\n", new System.Text.UTF8Encoding(false));
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
+        });
+    }
+
+    /// <summary>
+    /// The translation shown or not, as the language setting says: the names and words into the database or the game's
+    /// back, the translation's pictures in front of the game's; messages and choices are looked up as they're shown.
+    /// </summary>
+    void ApplyTranslation()
+    {
+        bool on = _translation is not null && _settings.Language == UiLanguage.English;
+        if (on == _translated) return;
+        bool first = _translated is null;
+        _translated = on;
+        Ui.Lang.GameTranslated = on;
+        if (_translation is null) return;
+        _translation.Apply(_db, on);
+        if (_db.Words.Length > 63) Camp.MenuList.PageLabel = _db.Words[63];
+        string pictures = Path.Combine(_translation.Folder, "BMP");
+        _folder.PictureOverride = on ? pictures : null;
+        if (!first && Directory.Exists(pictures)) _tex.Forget(Directory.GetFiles(pictures).Select(Path.GetFileName).OfType<string>());
+    }
+
+    /// <summary>
+    /// Options → Dump Script for Translation: the game's texts, as the game has them, into translation/jp, with the guide
+    /// to translating them beside it (translation/README.txt, translation/LLM PROMPT.txt). What it did, for the option's value.
+    /// </summary>
+    string DumpTexts()
+    {
+        try
+        {
+            var g = new GameFolder(_folder.Root, _folder.RtpRoot);
+            int n = TextDump.Write(g, Database.Load(g), Path.Combine(TranslationRoot, "jp"), TranslationGuide.FileHeader);
+            var utf8 = new System.Text.UTF8Encoding(false);
+            File.WriteAllText(Path.Combine(TranslationRoot, "README.txt"), TranslationGuide.Readme, utf8);
+            File.WriteAllText(Path.Combine(TranslationRoot, "LLM PROMPT.txt"), TranslationGuide.Prompt, utf8);
+            return Ui.Lang.T($"Done: {n} Files", $"完了（{n}ファイル）");
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException)
+        {
+            return Ui.Lang.T("Couldn't Write the Files", "書き出せませんでした");
+        }
+    }
 
     void ApplySettings()
     {
@@ -440,6 +523,7 @@ public sealed class BreezyGame : Game
         Ui.Ui.NameTags = _settings.NameTags;
         Ui.Backlog.HideNames = _settings.BacklogHidesNames;
         Ui.Lang.Japanese = _settings.Language == UiLanguage.Japanese;
+        ApplyTranslation();
     }
 
     void ApplyDisplay()
@@ -1786,12 +1870,12 @@ public sealed class BreezyGame : Game
     {
         var msg = _runner?.Message ?? (_runner?.Choice is not null ? _runner.LastMessage : null);
         if (msg is null) return;
-        DrawMessage(_sb, _ui, _tex, msg.Window, msg.Face, msg.FaceRight, msg.FaceFlip, msg.Lines);
+        DrawMessage(_sb, _ui, _tex, msg.Window, msg.Face, msg.FaceRight, msg.FaceFlip, msg.Lines, msg.Small);
     }
 
     /// <summary>A message (FUN_004148a4) in its window — top, centre, bottom (FUN_0040d18c): the window 608 × 160 at (16, 16 + 144 × window), laid out by <see cref="Ui.Ui.Message"/>.</summary>
-    public static void DrawMessage(SpriteBatch sb, Ui.Ui ui, Textures tex, int window, int faceId, bool faceRight, bool faceFlip, IReadOnlyList<string> lines) =>
-        ui.Message(sb, faceId > 0 ? tex.Get($"FACE_{faceId:000}.BMP") : null, 16 + 144 * Math.Clamp(window, 0, 2), faceRight, faceFlip, lines);
+    public static void DrawMessage(SpriteBatch sb, Ui.Ui ui, Textures tex, int window, int faceId, bool faceRight, bool faceFlip, IReadOnlyList<string> lines, bool small = false) =>
+        ui.Message(sb, faceId > 0 ? tex.Get($"FACE_{faceId:000}.BMP") : null, 16 + 144 * Math.Clamp(window, 0, 2), faceRight, faceFlip, lines, small: small);
 
     /// <summary>The bar shows on the choice's row: the pointer is on it (it starts on the first), or keys moved it.</summary>
     bool _choiceActive;
@@ -1806,7 +1890,9 @@ public sealed class BreezyGame : Game
     /// </summary>
     Rectangle ChoiceRect(string[] opts)
     {
-        int units = opts.Max(o => Bin.Sjis.GetByteCount(o) + 1) / 2 + 2, w = units * 12, h = (opts.Length + 1) * 16;
+        int units = opts.Max(o => Bin.Sjis.GetByteCount(o) + 1) / 2 + 2, h = (opts.Length + 1) * 16;
+        // as wide as the text needs too: a translation's options are in another font's widths
+        int w = Math.Max(units * 12, Math.Min(608, opts.Max(_ui.Measure12) + 36));
         int y = _runner?.LastMessage is { } m ? (m.Window == 2 ? 304 - h : 464 - h) : 240 - h / 2;
         return new Rectangle(Math.Clamp(320 - units * 8, 16, 624 - w), Math.Clamp(y, 16, 464 - h), w, h);
     }

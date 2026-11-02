@@ -66,7 +66,11 @@ public sealed class GameFolder
     public byte[] ReadData(string relative) =>
         File.ReadAllBytes(FindIn(Root, relative) ?? throw new FileNotFoundException($"missing game file {relative}", Path.Combine(Root, relative)));
 
-    public IndexedBitmap? Bitmap(string fileName) => Find("BMP/" + fileName) is { } p ? IndexedBitmap.Decode(Read(p), p) : null;
+    /// <summary>A folder whose pictures replace the game's of the same name (a translation's BMP folder), or null.</summary>
+    public string? PictureOverride { get; set; }
+
+    public IndexedBitmap? Bitmap(string fileName) =>
+        ((PictureOverride is { } o && Directory.Exists(o) ? FindIn(o, fileName) : null) ?? Find("BMP/" + fileName)) is { } p ? IndexedBitmap.Decode(Read(p), p) : null;
 
     /// <summary>Files read ahead (<see cref="ReadAhead"/>), by path, kept: a picture is made again at other settings.</summary>
     readonly ConcurrentDictionary<string, byte[]> _readAhead = new(StringComparer.OrdinalIgnoreCase);

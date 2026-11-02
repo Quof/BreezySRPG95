@@ -47,6 +47,17 @@ public sealed class Textures(GraphicsDevice device, GameFolder game) : IDisposab
         return t;
     }
 
+    /// <summary>
+    /// Pictures to be made again the next time they're asked for (a translation's pictures shown or taken away). The old
+    /// textures aren't disposed: something drawn may still hold one.
+    /// </summary>
+    public void Forget(IEnumerable<string> fileNames)
+    {
+        var names = fileNames.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var k in _cache.Keys.Where(k => names.Contains(k.Item1)).ToList()) _cache.Remove(k);
+        foreach (var k in _silhouettes.Keys.Where(names.Contains).ToList()) _silhouettes.Remove(k);
+    }
+
     public void Dispose()
     {
         foreach (var t in _cache.Values) t?.Dispose();

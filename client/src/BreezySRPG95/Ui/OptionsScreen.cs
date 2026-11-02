@@ -60,6 +60,12 @@ public sealed class OptionsScreen
 
     public bool Done { get; private set; }
 
+    /// <summary>Dump Script for Translation (below Language): writes the game's texts out, and says what it did.</summary>
+    public Func<string>? Dump { get; init; }
+    /// <summary>The game has a translation (translation/en): English says it's translated.</summary>
+    public bool GameTranslated { get; init; }
+    string? _dumped;
+
     /// <summary>In a game (not on the title): タイトルへ戻る and ゲーム終了 on the main page, each asking first.</summary>
     readonly Action? _toTitle, _quit;
     readonly string[] _yesNo;
@@ -165,7 +171,7 @@ public sealed class OptionsScreen
             (_s.WindowWidth, _s.WindowHeight) = sizes[i];
         }
         // the window, then the look, then the rest
-        return new()
+        var rows = new List<Row>
         {
             Choice(T("Window Size", "画面解像度"), SizeNames, SizeChosen, SizePick),
             Choice(T("Scaling", "拡大方式"),
@@ -179,10 +185,16 @@ public sealed class OptionsScreen
                 () => FontOrder.Select(f => TextFonts.Available(f) ? FontName(f) : FontName(f) + T(" (Not on This PC)", "（このPCにありません）")).ToArray(),
                 () => Math.Max(0, Array.IndexOf(FontOrder, _s.Font)), i => _s.Font = FontOrder[i]),
             Gap(),
-            Choice(T("Language", "言語"), () => new[] { "English", "日本語" }, () => (int)_s.Language, i => _s.Language = (UiLanguage)i),
+            Choice(T("Language", "言語"), () => new[] { GameTranslated ? T("English (Game Translated)", "English（ゲーム翻訳あり）") : "English", "日本語" },
+                () => (int)_s.Language, i => _s.Language = (UiLanguage)i),
             Choice(T("Save / Load Screen", "セーブ・ロード画面"), () => new[] { T("Extended (100 Files)", "拡張（100ファイル）"), T("Original (8 Files)", "オリジナル（8ファイル）") },
                 () => (int)_s.SaveScreen, i => _s.SaveScreen = (SaveScreen)i),
         };
+        if (Dump is { } dump)
+            rows.Insert(rows.FindIndex(r => r.Label == T("Language", "言語")) + 1,
+                new Row(T("Dump Script for Translation", "翻訳用スクリプトを書き出す"), () => _dumped ?? "translation/jp",
+                    Activate: () => { _dumped = dump(); Sfx.Click(); Refresh(); }));
+        return rows;
     }
 
     /// <summary>The fonts as the list shows them: the original's, the pixel fonts, the rest.</summary>
