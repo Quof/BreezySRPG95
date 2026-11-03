@@ -278,10 +278,13 @@ public static class TextDump
 
     /// <summary>
     /// Writes the game's texts into <paramref name="dir"/>: DATABASE.txt and one SMAP_nnn.txt per map, each text's
-    /// translation half its own words, ready to be translated. Returns the number of files written.
+    /// translation half its own words, ready to be translated. Returns the number of files written; <paramref
+    /// name="progress"/> hears how much is done (0 to 1) after each file.
     /// </summary>
-    public static int Write(GameFolder g, Database db, string dir, string header)
+    public static int Write(GameFolder g, Database db, string dir, string header, Action<double>? progress = null)
     {
+        var maps = MapFiles(g).ToList();
+        int done = 0;
         Directory.CreateDirectory(dir);
         int files = 0;
         var sb = new StringBuilder();
@@ -294,9 +297,11 @@ public static class TextDump
         sb.Append(header.Replace("{FILE}", "DATABASE (names, item and spell descriptions, menu words)"));
         foreach (var (key, lines) in DatabaseTexts(db)) TextFile.Write(sb, key, lines, lines);
         Save(Translation.DatabaseFile);
+        progress?.Invoke(1.0 / (maps.Count + 1));
 
-        foreach (var path in MapFiles(g))
+        foreach (var path in maps)
         {
+            progress?.Invoke((1.0 + done++) / (maps.Count + 1));
             var map = MapData.Load(path);
             string name = Path.GetFileNameWithoutExtension(path).ToUpperInvariant();
             int index = int.TryParse(name.AsSpan(5), out var n) ? n - 1 : -1;
@@ -309,6 +314,7 @@ public static class TextDump
             foreach (var (key, lines) in texts) TextFile.Write(sb, key, lines, lines);
             Save(name);
         }
+        progress?.Invoke(1);
         return files;
     }
 }

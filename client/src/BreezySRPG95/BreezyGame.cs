@@ -471,22 +471,23 @@ public sealed class BreezyGame : Game
 
     /// <summary>
     /// Options → Dump Script for Translation: the game's texts, as the game has them, into translation/jp, with the guide
-    /// to translating them beside it (translation/README.txt, translation/LLM PROMPT.txt). What it did, for the option's value.
+    /// to translating them beside it (translation/README.txt, translation/LLM PROMPT.txt). The number of files written, or null.
+    /// Run in the background (OptionsScreen shows its progress): it reads the game afresh, apart from what's playing.
     /// </summary>
-    string DumpTexts()
+    int? DumpTexts(Action<double> progress)
     {
         try
         {
             var g = new GameFolder(_folder.Root, _folder.RtpRoot);
-            int n = TextDump.Write(g, Database.Load(g), Path.Combine(TranslationRoot, "jp"), TranslationGuide.FileHeader);
+            int n = TextDump.Write(g, Database.Load(g), Path.Combine(TranslationRoot, "jp"), TranslationGuide.FileHeader, progress);
             var utf8 = new System.Text.UTF8Encoding(false);
             File.WriteAllText(Path.Combine(TranslationRoot, "README.txt"), TranslationGuide.Readme, utf8);
             File.WriteAllText(Path.Combine(TranslationRoot, "LLM PROMPT.txt"), TranslationGuide.Prompt, utf8);
-            return Ui.Lang.T($"Done: {n} Files", $"完了（{n}ファイル）");
+            return n;
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException)
         {
-            return Ui.Lang.T("Couldn't Write the Files", "書き出せませんでした");
+            return null;
         }
     }
 

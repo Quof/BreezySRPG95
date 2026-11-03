@@ -60,11 +60,18 @@ public sealed class OptionsScreen
 
     public bool Done { get; private set; }
 
-    /// <summary>Dump Script for Translation (below Language): writes the game's texts out, and says what it did.</summary>
-    public Func<string>? Dump { get; init; }
+    /// <summary>
+    /// Dump Script for Translation (below Language): writes the game's texts out, telling how far it has got (0 to 1), and
+    /// returns the number of files written (null: they couldn't be). Run in the background, a box with a progress bar
+    /// over the options meanwhile; then the row says how it went, in the language chosen.
+    /// </summary>
+    public Func<Action<double>, int?>? Dump { get; init; }
+    Task<int?>? _dumping;
+    double _dumpProgress;
     /// <summary>The game has a translation (translation/en): English says it's translated.</summary>
     public bool GameTranslated { get; init; }
-    string? _dumped;
+    /// <summary>The last dump: not yet (null), the files written, or −1 when they couldn't be.</summary>
+    int? _dumped;
 
     /// <summary>In a game (not on the title): タイトルへ戻る and ゲーム終了 on the main page, each asking first.</summary>
     readonly Action? _toTitle, _quit;
@@ -192,8 +199,13 @@ public sealed class OptionsScreen
         };
         if (Dump is { } dump)
             rows.Insert(rows.FindIndex(r => r.Label == T("Language", "言語")) + 1,
-                new Row(T("Dump Script for Translation", "翻訳用スクリプトを書き出す"), () => _dumped ?? "translation/jp",
-                    Activate: () => { _dumped = dump(); Sfx.Click(); Refresh(); }));
+                new Row(T("Dump Script for Translation", "翻訳用スクリプトを書き出す"), () => _dumped switch
+                    {
+                        null => "translation/jp",
+                        < 0 => T("Couldn't Write the Files", "書き出せませんでした"),
+                        var n => T($"Finished: {n}/{n} files", $"完了：{n}/{n}ファイル"),
+                    },
+                    Activate: () => { _dumpProgress = 0; _dumping = Task.Run(() => dump(p => Volatile.Write(ref _dumpProgress, p))); Sfx.Click(); }));
         return rows;
     }
 
@@ -446,6 +458,16 @@ public sealed class OptionsScreen
     /// <param name="typed">text typed since the last update (for the Nametag detection box)</param>
     public void Update(BattleInput i, Point mouse, Controls controls, bool held = false, string typed = "")
     {
+        // the script being written: nothing else until it's done, then what it did in the row's value
+        if (_dumping is { } dumping)
+        {
+            if (!dumping.IsCompleted) return;
+            _dumped = dumping.IsCompletedSuccessfully && dumping.Result is { } files ? files : -1;
+            _dumping = null;
+            Sfx.Click();
+            Refresh();
+            return;
+        }
         if (_tags is { } tags) { UpdateNameTags(tags, i, mouse, controls, typed); return; }
         if (_confirm is { } q)
         {
@@ -591,5 +613,24 @@ public sealed class OptionsScreen
             else _ui.Fill(sb, q.Rect, new Color(8, 10, 18));
             q.Draw(sb, _ui, true, frame);
         }
+        if (_dumping is not null) DrawDumping(sb);
+    }
+
+    /// <summary>The box while the script is written: what's happening, a bar filling as the files are, the percentage.</summary>
+    void DrawDumping(SpriteBatch sb)
+    {
+        string label = T("Dumping script for translation...", "翻訳用スクリプトを書き出し中…");
+        int w = Math.Max(300, _ui.Measure12(label) + 40), h = 64;
+        var box = new Rectangle(320 - w / 2, 240 - h / 2, w, h);
+        if (Ui.Modern) _ui.ModernBox(sb, box, new Color(8, 10, 18), 10, 1f, shadow: false);
+        else _ui.Fill(sb, box, new Color(8, 10, 18));
+        _ui.Text12(sb, label, box.X + (w - _ui.Measure12(label)) / 2, box.Y + 12, Color.White);
+        double p = Math.Clamp(Volatile.Read(ref _dumpProgress), 0, 1);
+        var accent = Ui.Gilded ? Ui.Gold : Ui.Accent;
+        var track = new Rectangle(box.X + 20, box.Y + 38, w - 80, 8);
+        _ui.Fill(sb, track, Color.Black * 0.55f);
+        _ui.Fill(sb, new Rectangle(track.X, track.Y, (int)(track.Width * p), track.Height), accent);
+        if (_ui.SmallText.Get($"{(int)(p * 100)}%") is { } pct)
+            pct.Draw(sb, new Vector2(box.Right - 20 - pct.Width, track.Y + (track.Height - pct.LayoutHeight) / 2), Color.White);
     }
 }
