@@ -112,20 +112,33 @@ public sealed class Translation
 
     /// <summary>
     /// The translation of a message, or null (the game's own then). One whose original no longer says what the game does
-    /// is still used, and told (<see cref="Problems"/>): the key is what places it.
+    /// is still used where the game's words are Japanese (the key is what places it: the original was likely changed in
+    /// the file), and told (<see cref="Problems"/>); where they aren't — a game already patched (<see cref="OriginalPatch"/>),
+    /// its commands moved — it isn't.
     /// </summary>
     public IReadOnlyList<string>? Message(EventScript s, MessageNode m)
     {
-        if (Entry(s.Map, MessageKey(s, m)) is not { } e) return null;
-        if (!Same(e.Original, m.Lines)) Report($"{s.Map}: {e.Key}: the game's words aren't the ones in the file");
+        if (Entry(s.Map, MessageKey(s, m)) is not { } e || !Fits(e, m.Lines, s.Map)) return null;
         return e.Text.Select(Plain).ToList();
     }
+
+    /// <summary>Whether an entry is to be used on the game's <paramref name="game"/> lines (see <see cref="Message"/>), told when they differ.</summary>
+    bool Fits(TextEntry e, IReadOnlyList<string> game, string file)
+    {
+        if (Same(e.Original, game)) return true;
+        bool japanese = Japanese(game);
+        Report($"{file}: {e.Key}: the game's words aren't the ones in the file" + (japanese ? "" : " (and aren't Japanese: not used)"));
+        return japanese;
+    }
+
+    /// <summary>Text with kana, kanji or full-width characters in it: the game's own, not a translation's.</summary>
+    public static bool Japanese(IEnumerable<string> lines) =>
+        lines.Any(l => l.Any(c => c is >= '\u3000' and <= '\u30FF' or >= '\u4E00' and <= '\u9FFF' or >= '\uFF00' and <= '\uFFEF'));
 
     /// <summary>A character choice's options translated (as many as it has: missing ones stay the game's), or null.</summary>
     public string[]? Choice(EventScript s, ChoiceNode c)
     {
-        if (Entry(s.Map, ChoiceKey(s, c)) is not { } e) return null;
-        if (!Same(e.Original, c.Options)) Report($"{s.Map}: {e.Key}: the game's options aren't the ones in the file");
+        if (Entry(s.Map, ChoiceKey(s, c)) is not { } e || !Fits(e, c.Options, s.Map)) return null;
         if (e.Text.Length != c.Options.Length) Report($"{s.Map}: {e.Key}: {e.Text.Length} options for the game's {c.Options.Length}");
         return c.Options.Select((o, i) => i < e.Text.Length && e.Text[i].Length > 0 ? Plain(e.Text[i]) : o).ToArray();
     }
@@ -161,8 +174,7 @@ public sealed class Translation
 
         string? One(string key, string game)
         {
-            if (Entry(DatabaseFile, key) is not { } e) return null;
-            if (!Same(e.Original, Lines(game))) Report($"{DatabaseFile}: {key}: the game's words aren't the ones in the file");
+            if (Entry(DatabaseFile, key) is not { } e || !Fits(e, Lines(game), DatabaseFile)) return null;
             return e.Text is [Blank] ? "" : string.Join("\r\n", e.Text.Select(Plain));
         }
         for (int i = 0; i < db.Units.Length; i++)

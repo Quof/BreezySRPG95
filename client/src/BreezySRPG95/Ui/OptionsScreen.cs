@@ -62,16 +62,37 @@ public sealed class OptionsScreen
 
     /// <summary>
     /// Dump Script for Translation (below Language): writes the game's texts out, telling how far it has got (0 to 1), and
-    /// returns the number of files written (null: they couldn't be). Run in the background, a box with a progress bar
-    /// over the options meanwhile; then the row says how it went, in the language chosen.
+    /// returns the number of files written (null: they couldn't be). Run in the background (<see cref="RunBusy"/>); then
+    /// the row says how it went, in the language chosen.
     /// </summary>
     public Func<Action<double>, int?>? Dump { get; init; }
-    Task<int?>? _dumping;
-    double _dumpProgress;
-    /// <summary>The game has a translation (translation/en): English says it's translated.</summary>
+    /// <summary>Build Patch for the Original (below the dump, with a translation): the same, writing the patch.</summary>
+    public Func<Action<double>, int?>? BuildPatch { get; init; }
+    /// <summary>The game has a translation (translation/en): English says it's translated, and the patch can be built.</summary>
     public bool GameTranslated { get; init; }
-    /// <summary>The last dump: not yet (null), the files written, or −1 when they couldn't be.</summary>
-    int? _dumped;
+    /// <summary>The last dump and patch: not yet (null), the files written, or −1 when they couldn't be.</summary>
+    int? _dumped, _patched;
+
+    /// <summary>Work running in the background, what the box over the options says meanwhile, and where its result goes.</summary>
+    Task<int?>? _busy;
+    string _busyLabel = "";
+    Action<int>? _busyDone;
+    double _busyProgress;
+
+    /// <summary>Runs <paramref name="work"/> in the background, a box with <paramref name="label"/> and a progress bar over the options till it's done.</summary>
+    void RunBusy(string label, Func<Action<double>, int?> work, Action<int> done)
+    {
+        (_busyLabel, _busyDone, _busyProgress) = (label, done, 0);
+        _busy = Task.Run(() => work(p => Volatile.Write(ref _busyProgress, p)));
+        Sfx.Click();
+    }
+
+    static string Finished(int? files, string none) => files switch
+    {
+        null => none,
+        < 0 => T("Couldn't Write the Files", "書き出せませんでした"),
+        var n => T($"Finished: {n}/{n} files", $"完了：{n}/{n}ファイル"),
+    };
 
     /// <summary>In a game (not on the title): タイトルへ戻る and ゲーム終了 on the main page, each asking first.</summary>
     readonly Action? _toTitle, _quit;
@@ -197,15 +218,15 @@ public sealed class OptionsScreen
             Choice(T("Save / Load Screen", "セーブ・ロード画面"), () => new[] { T("Extended (100 Files)", "拡張（100ファイル）"), T("Original (8 Files)", "オリジナル（8ファイル）") },
                 () => (int)_s.SaveScreen, i => _s.SaveScreen = (SaveScreen)i),
         };
+        int at = rows.FindIndex(r => r.Label == T("Language", "言語")) + 1;
+        if (BuildPatch is { } patch)
+            rows.Insert(at, GameTranslated
+                ? new Row(T("Build Patch for the Original", "オリジナル用パッチを作る"), () => Finished(_patched, "translation/patch"),
+                    Activate: () => RunBusy(T("Building the patch...", "パッチを作成中…"), patch, n => _patched = n))
+                : new Row(T("Build Patch for the Original", "オリジナル用パッチを作る"), () => T("Needs translation/en", "translation/en が必要です")));
         if (Dump is { } dump)
-            rows.Insert(rows.FindIndex(r => r.Label == T("Language", "言語")) + 1,
-                new Row(T("Dump Script for Translation", "翻訳用スクリプトを書き出す"), () => _dumped switch
-                    {
-                        null => "translation/jp",
-                        < 0 => T("Couldn't Write the Files", "書き出せませんでした"),
-                        var n => T($"Finished: {n}/{n} files", $"完了：{n}/{n}ファイル"),
-                    },
-                    Activate: () => { _dumpProgress = 0; _dumping = Task.Run(() => dump(p => Volatile.Write(ref _dumpProgress, p))); Sfx.Click(); }));
+            rows.Insert(at, new Row(T("Dump Script for Translation", "翻訳用スクリプトを書き出す"), () => Finished(_dumped, "translation/jp"),
+                Activate: () => RunBusy(T("Dumping script for translation...", "翻訳用スクリプトを書き出し中…"), dump, n => _dumped = n)));
         return rows;
     }
 
@@ -458,12 +479,12 @@ public sealed class OptionsScreen
     /// <param name="typed">text typed since the last update (for the Nametag detection box)</param>
     public void Update(BattleInput i, Point mouse, Controls controls, bool held = false, string typed = "")
     {
-        // the script being written: nothing else until it's done, then what it did in the row's value
-        if (_dumping is { } dumping)
+        // the script or the patch being written: nothing else until it's done, then what it did in the row's value
+        if (_busy is { } busy)
         {
-            if (!dumping.IsCompleted) return;
-            _dumped = dumping.IsCompletedSuccessfully && dumping.Result is { } files ? files : -1;
-            _dumping = null;
+            if (!busy.IsCompleted) return;
+            _busyDone?.Invoke(busy.IsCompletedSuccessfully && busy.Result is { } files ? files : -1);
+            _busy = null;
             Sfx.Click();
             Refresh();
             return;
@@ -613,19 +634,19 @@ public sealed class OptionsScreen
             else _ui.Fill(sb, q.Rect, new Color(8, 10, 18));
             q.Draw(sb, _ui, true, frame);
         }
-        if (_dumping is not null) DrawDumping(sb);
+        if (_busy is not null) DrawBusy(sb);
     }
 
-    /// <summary>The box while the script is written: what's happening, a bar filling as the files are, the percentage.</summary>
-    void DrawDumping(SpriteBatch sb)
+    /// <summary>The box while the script or the patch is written: what's happening, a bar filling as the files are, the percentage.</summary>
+    void DrawBusy(SpriteBatch sb)
     {
-        string label = T("Dumping script for translation...", "翻訳用スクリプトを書き出し中…");
+        string label = _busyLabel;
         int w = Math.Max(300, _ui.Measure12(label) + 40), h = 64;
         var box = new Rectangle(320 - w / 2, 240 - h / 2, w, h);
         if (Ui.Modern) _ui.ModernBox(sb, box, new Color(8, 10, 18), 10, 1f, shadow: false);
         else _ui.Fill(sb, box, new Color(8, 10, 18));
         _ui.Text12(sb, label, box.X + (w - _ui.Measure12(label)) / 2, box.Y + 12, Color.White);
-        double p = Math.Clamp(Volatile.Read(ref _dumpProgress), 0, 1);
+        double p = Math.Clamp(Volatile.Read(ref _busyProgress), 0, 1);
         var accent = Ui.Gilded ? Ui.Gold : Ui.Accent;
         var track = new Rectangle(box.X + 20, box.Y + 38, w - 80, 8);
         _ui.Fill(sb, track, Color.Black * 0.55f);

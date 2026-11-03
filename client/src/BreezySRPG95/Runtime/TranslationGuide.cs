@@ -19,10 +19,46 @@ public static class TranslationGuide
 
     public const string ProblemsHeader = """
         # Written by BreezySRPG95 when it checked this translation against the game. One problem a line: the file, the
-        # entry's key, what's wrong. Texts with problems are still used where the key finds them. Fix the files and start
-        # the game again; this file goes away when nothing is left to report. See ../README.txt.
+        # entry's key, what's wrong. Texts with problems are still used where the key finds them, if the game's text there
+        # is Japanese. Fix the files and start the game again; this file goes away when nothing is left to report. See
+        # ../README.txt.
 
 
+        """;
+
+    public const string PatchReportHeader = """
+        # Written by BreezySRPG95 when it built translation/patch: the texts that didn't fit SRPG Maker 95 as they were.
+        # A line in a message is 40 bytes at most (a letter is 1 byte, a Japanese character 2), a name 31, a description
+        # 79; what's longer was cut. Characters Shift-JIS hasn't got (accents, curly quotes the game can't show) became ?.
+        # Shorten or change those texts in translation/en and build the patch again.
+
+
+        """;
+
+    /// <summary>translation/patch/README-PATCH.txt (CRLF when written: Notepad on old Windows, where the original plays).</summary>
+    public const string PatchReadme = """
+        TRANSLATION PATCH FOR SRPG MAKER 95
+        ===================================
+
+        This folder was made by BreezySRPG95 (Options > Display > Build Patch for the Original) from the translation in
+        translation/en. It holds translated copies of the game's own files, for the original program (SRPGEXEC.EXE)
+        to play in English. BreezySRPG95 plays them too.
+
+        TO INSTALL
+          1. Back up the game's folder (at least its MAP folder and its .DAT files).
+          2. Copy everything in this folder (MAP, the .DAT files, BMP if there is one) into the game's folder,
+             replacing the files there.
+          3. If the game's folder has a "translation" folder, take translation/en out of it: BreezySRPG95 would
+             otherwise try to translate the already translated game.
+
+        TO UNDO
+          Put the backed-up files back.
+
+        NOTES
+          - Long messages are split into more message windows than the original had, so a save made in the middle of
+            an event with BreezySRPG95 before patching may not continue that event correctly afterwards. Ordinary
+            saves (between events) are fine.
+          - Texts that had to be shortened to fit are listed in translation/PATCH REPORT.txt.
         """;
 
     public const string Readme = """
@@ -45,6 +81,9 @@ public static class TranslationGuide
                                    redrawn. A picture here replaces the game's BMP/ picture of the same file name.
           translation/en/PROBLEMS.txt
                                    Written by BreezySRPG95 when your files don't fit the game (see PROBLEMS below).
+          translation/patch/       Written by Options > Display > Build Patch for the Original: your translation in
+                                   copies of the game's own files, so SRPG Maker 95 itself plays it in English (see
+                                   A PATCH FOR THE ORIGINAL below).
 
 
         HOW TO START
@@ -156,6 +195,24 @@ public static class TranslationGuide
         translation/en/PROBLEMS.txt: a key the game hasn't got (a mistyped "<<<" line), Japanese above ">>>" that isn't
         the game's (changed by hand, or translated by a language model too), a choice with too many or too few options,
         an entry that is in a file twice. Nothing in it stops the game: the texts are still used where they can be.
+
+
+        A PATCH FOR THE ORIGINAL
+        ------------------------
+
+        Options > Display > Build Patch for the Original writes your translation into copies of the game's own files
+        (the maps' events, UNIT.DAT, ITEM.DAT ...) in translation/patch, for players of the original program,
+        SRPGEXEC.EXE. It has none of BreezySRPG95's text fitting, so the patch fits the text to it:
+          - A message line is at most 40 bytes (a letter is 1 byte, a Japanese character 2) and a window 5 lines.
+            Messages are wrapped between words, and a longer message is split into more windows, one click each.
+          - Names are cut at 31 bytes, item and spell descriptions at 79, death messages at about 370.
+          - Text is stored in Shift-JIS: characters it hasn't got (accents and the like) become ?.
+          - The sentence pieces in WORD get a space in front, as the original joins them with nothing between.
+          - The original's menus and windows have fixed widths: check that long names and menu words don't run
+            past them in SRPGEXEC.EXE itself.
+        What had to be cut is listed in translation/PATCH REPORT.txt. translation/patch/README-PATCH.txt tells
+        players how to install it. The patch holds the game's map files, translated: share it only where sharing the
+        game's files is all right.
 
 
         SHARING A TRANSLATION

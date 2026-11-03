@@ -413,9 +413,9 @@ public sealed class BreezyGame : Game
 
     /// <summary>The options; in a game (not on the title) with タイトルへ戻る and ゲーム終了, each fading out first as the title's choices do.</summary>
     void OpenOptions() => _options = _title is not null
-        ? new Ui.OptionsScreen(_settings, _ui, _folder.Root, ApplySettings, yesNo: Ui.Lang.YesNo(_db)) { Dump = DumpTexts, GameTranslated = _translation is not null }
+        ? new Ui.OptionsScreen(_settings, _ui, _folder.Root, ApplySettings, yesNo: Ui.Lang.YesNo(_db)) { Dump = DumpTexts, BuildPatch = BuildPatch, GameTranslated = _translation is not null }
         : new Ui.OptionsScreen(_settings, _ui, _folder.Root, ApplySettings,
-            toTitle: () => AfterFade(10, OpenTitle), quit: () => AfterFade(10, Exit), yesNo: Ui.Lang.YesNo(_db)) { Dump = DumpTexts, GameTranslated = _translation is not null };
+            toTitle: () => AfterFade(10, OpenTitle), quit: () => AfterFade(10, Exit), yesNo: Ui.Lang.YesNo(_db)) { Dump = DumpTexts, BuildPatch = BuildPatch, GameTranslated = _translation is not null };
 
     // ---------------- translation (modern) ----------------
 
@@ -484,6 +484,41 @@ public sealed class BreezyGame : Game
             File.WriteAllText(Path.Combine(TranslationRoot, "README.txt"), TranslationGuide.Readme, utf8);
             File.WriteAllText(Path.Combine(TranslationRoot, "LLM PROMPT.txt"), TranslationGuide.Prompt, utf8);
             return n;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Options → Build Patch for the Original: translation/en written into copies of the game's own files for SRPG Maker
+    /// 95 itself to play (Srpg95.Data.OriginalPatch), in translation/patch with README-PATCH.txt; what had to be cut to
+    /// fit goes into translation/PATCH REPORT.txt (removed when nothing was). The files an earlier patch wrote there go
+    /// first, so the folder holds this translation's patch alone. Run in the background, as the dump is. The number of
+    /// files written, or null.
+    /// </summary>
+    int? BuildPatch(Action<double> progress)
+    {
+        try
+        {
+            var g = new GameFolder(_folder.Root, _folder.RtpRoot);
+            if (Translation.Load(Path.Combine(TranslationRoot, "en")) is not { } t) return null;
+            string dir = Path.Combine(TranslationRoot, "patch");
+            if (Directory.Exists(dir))
+            {
+                foreach (var f in new[] { "UNIT.DAT", "CLASS.DAT", "ITEM.DAT", "MAGIC.DAT", "GEOLOGY.DAT", "WORD.DAT" }.Select(f => Path.Combine(dir, f)).Where(File.Exists))
+                    File.Delete(f);
+                foreach (var sub in new[] { "MAP", "BMP" }.Select(s => Path.Combine(dir, s)).Where(Directory.Exists))
+                    foreach (var f in Directory.GetFiles(sub)) File.Delete(f);
+            }
+            var r = OriginalPatch.Build(g, t, dir, lines => Ui.Ui.SplitSpeaker(lines).Name is not null, progress);
+            var utf8 = new System.Text.UTF8Encoding(false);
+            File.WriteAllText(Path.Combine(dir, "README-PATCH.txt"), TranslationGuide.PatchReadme.Replace("\n", "\r\n"), utf8);
+            string report = Path.Combine(TranslationRoot, "PATCH REPORT.txt");
+            if (r.Notes.Count == 0) { if (File.Exists(report)) File.Delete(report); }
+            else File.WriteAllText(report, TranslationGuide.PatchReportHeader + string.Join("\n", r.Notes) + "\n", utf8);
+            return r.Files;
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException)
         {

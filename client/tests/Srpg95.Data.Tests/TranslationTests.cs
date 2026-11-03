@@ -116,6 +116,48 @@ public class TranslationTests
     }
 
     [Fact]
+    public void The_original_gets_40_byte_lines_and_five_line_windows_each_with_the_speaker()
+    {
+        var notes = new List<string>();
+        var windows = OriginalPatch.Fit(new[] { "Rutee:", string.Join(' ', Enumerable.Repeat("word", 60)) }, true, "x", notes);
+        Assert.All(windows, w => Assert.Equal("Rutee:", w[0]));
+        Assert.All(windows, w => Assert.InRange(w.Count, 2, OriginalPatch.WindowLines));
+        Assert.All(windows.SelectMany(w => w), l => Assert.InRange(Bin.Sjis.GetByteCount(l), 0, OriginalPatch.LineBytes));
+        Assert.Equal(string.Join(' ', Enumerable.Repeat("word", 60)), string.Join(' ', windows.SelectMany(w => w.Skip(1))));   // nothing lost
+        // Japanese without spaces breaks between characters, never inside one
+        var ja = OriginalPatch.Fit(new[] { new string('あ', 30) }, false, "x", notes);
+        Assert.Equal(new[] { new string('あ', 20), new string('あ', 10) }, ja[0]);
+        Assert.Empty(notes);
+    }
+
+    static string? Folder(string name)
+    {
+        for (var d = new DirectoryInfo(AppContext.BaseDirectory); d is not null; d = d.Parent)
+            if (Directory.Exists(Path.Combine(d.FullName, name))) return Path.Combine(d.FullName, name);
+        return null;
+    }
+
+    [Fact]
+    public void A_map_with_a_longer_script_reads_back_with_everything_else_as_it_was()
+    {
+        if (Folder("えるまに") is not { } root) return;
+        var path = Path.Combine(root, "MAP", "SMAP_001.DAT");
+        var d = File.ReadAllBytes(path);
+        var map = MapData.Parse(d);
+        var opening = map.Scripts["OPENING"].Commands;
+        // a thousand more message lines at the start: more blocks than the script had
+        var longer = Enumerable.Range(0, 1000).Select(i => new Command(Op.Message, 0, Bin.Sjis.GetBytes($"\0\0line {i}\0"))).Concat(opening).ToList();
+        var written = OriginalPatch.WriteMap(d, new Dictionary<string, List<Command>> { ["OPENING"] = longer });
+        var back = MapData.Parse(written);
+        Assert.Equal(longer.Select(c => Convert.ToHexString(c.Payload)), back.Scripts["OPENING"].Commands.Select(c => Convert.ToHexString(c.Payload)));
+        Assert.Equal(map.Scripts["OPENING"].Comment, back.Scripts["OPENING"].Comment);
+        foreach (var (name, s) in map.Scripts.Where(s => s.Key != "OPENING"))
+            Assert.Equal(s.Commands.Select(c => Convert.ToHexString(c.Payload)), back.Scripts[name].Commands.Select(c => Convert.ToHexString(c.Payload)));
+        Assert.True(written.AsSpan(0, MapData.ObjectsOffset(d) + 100 * 164).SequenceEqual(d.AsSpan(0, MapData.ObjectsOffset(d) + 100 * 164)));   // header, tiles, objects
+        Assert.Equal(d, OriginalPatch.WriteMap(d, new Dictionary<string, List<Command>>()));   // nothing changed: the same bytes
+    }
+
+    [Fact]
     public void A_long_translated_message_goes_on_over_more_windows_before_its_choice()
     {
         // a message, then a choice: translated, the message takes two windows, the second staying up under the choice
