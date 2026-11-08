@@ -51,7 +51,9 @@ public sealed class Settings
     public Scaling Scaling { get; set; } = Scaling.Integer;
     public bool Smooth { get; set; }
     public UiFont Font { get; set; } = UiFont.MsGothic;   // the original's
-    public UiLanguage Language { get; set; } = UiLanguage.Japanese;   // BreezySRPG95's own menus and messages
+    public UiLanguage Language { get; set; } = UiLanguage.Japanese;
+    /// <summary>No music or sounds heard while the window is in the background (Audio.Unfocused).</summary>
+    public bool MuteWhenUnfocused { get; set; }   // BreezySRPG95's own menus and messages
     public SaveScreen SaveScreen { get; set; } = SaveScreen.Extended;
 
     /// <summary>The window's size; 1280 × 960 for one too small to be one.</summary>

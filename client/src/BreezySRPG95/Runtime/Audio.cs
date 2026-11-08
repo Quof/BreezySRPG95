@@ -36,11 +36,35 @@ public sealed class Audio(GameFolder game) : IDisposable
         set
         {
             _musicVolume = value;
-            if (_stream is not null) _stream.Volume = Math.Clamp(value, 0, 1);
-            if (_wavLoop is not null) _wavLoop.Volume = Math.Clamp(value, 0, 1);
-            if (_mp3Stream is not null) _mp3Stream.Volume = Math.Clamp(value, 0, 1);
-            if (_bgmOpen) Mci($"setaudio breezy_bgm volume to {(int)(value * 1000)}");
+            ApplyMusicVolume();
         }
+    }
+
+    bool _unfocused;
+    /// <summary>
+    /// The window is in the background and the "mute when not in focus" option is on (modern): the music goes on silently,
+    /// so it's where the game is when the window comes back, and no sounds play.
+    /// </summary>
+    public bool Unfocused
+    {
+        get => _unfocused;
+        set
+        {
+            if (value == _unfocused) return;
+            _unfocused = value;
+            ApplyMusicVolume();
+        }
+    }
+
+    /// <summary>The music's volume as it's heard: none while <see cref="Unfocused"/>.</summary>
+    float BgmVolume => _unfocused ? 0 : Math.Clamp(_musicVolume, 0, 1);
+
+    void ApplyMusicVolume()
+    {
+        if (_stream is not null) _stream.Volume = BgmVolume;
+        if (_wavLoop is not null) _wavLoop.Volume = BgmVolume;
+        if (_mp3Stream is not null) _mp3Stream.Volume = BgmVolume;
+        if (_bgmOpen) Mci($"setaudio breezy_bgm volume to {(int)(BgmVolume * 1000)}");
     }
 
     // ---------------- SoundFont synth ----------------
@@ -182,7 +206,7 @@ public sealed class Audio(GameFolder game) : IDisposable
                 var bytes = midiBytes ?? fileBytes ?? File.ReadAllBytes(path);
                 var loopType = LoopAtMarkers && MidiTrim.LoopStart(bytes) is not null ? MidiFileLoopType.RpgMaker : MidiFileLoopType.None;
                 _sequencer.Play(new MidiFile(new MemoryStream(bytes), loopType), loop: true);
-                _stream = new DynamicSoundEffectInstance(Rate, AudioChannels.Stereo) { Volume = Math.Clamp(_musicVolume, 0, 1) };
+                _stream = new DynamicSoundEffectInstance(Rate, AudioChannels.Stereo) { Volume = BgmVolume };
                 FeedSynth();
                 _stream.Play();
                 return;
@@ -202,7 +226,7 @@ public sealed class Audio(GameFolder game) : IDisposable
             {
                 _wavLoop = _wavBgm.CreateInstance();
                 _wavLoop.IsLooped = true;
-                _wavLoop.Volume = Math.Clamp(_musicVolume, 0, 1);
+                _wavLoop.Volume = BgmVolume;
                 _wavLoop.Play();
                 return;
             }
@@ -210,7 +234,7 @@ public sealed class Audio(GameFolder game) : IDisposable
         if (!HasMci) return;   // off Windows: a track the synth or a looping sound can't play is silent
         if (midi && midiBytes is not null) path = TrimmedCopy(midiBytes) ?? path;
         Mci($"open \"{path}\" type {(midi ? "sequencer" : "waveaudio")} alias breezy_bgm");
-        Mci($"setaudio breezy_bgm volume to {(int)(_musicVolume * 1000)}");
+        Mci($"setaudio breezy_bgm volume to {(int)(BgmVolume * 1000)}");
         Mci("play breezy_bgm from 0");
         _bgmOpen = true;
     }
@@ -312,7 +336,7 @@ public sealed class Audio(GameFolder game) : IDisposable
         _mp3Samples = new float[Block * _mp3.Channels];
         _mp3Pcm = new byte[_mp3Samples.Length * 2];
         _mp3Stream = new DynamicSoundEffectInstance(_mp3.SampleRate, _mp3.Channels == 2 ? AudioChannels.Stereo : AudioChannels.Mono)
-            { Volume = Math.Clamp(_musicVolume, 0, 1) };
+            { Volume = BgmVolume };
         FeedMp3();
         _mp3Stream?.Play();
     }
@@ -419,7 +443,7 @@ public sealed class Audio(GameFolder game) : IDisposable
 
     public void PlaySe(string file)
     {
-        if (Muted || file.Length == 0) return;
+        if (Muted || _unfocused || file.Length == 0) return;
         Sound(file)?.Play(Math.Clamp(SoundVolume, 0, 1), 0, 0);
     }
 

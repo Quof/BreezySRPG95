@@ -619,6 +619,8 @@ public sealed class BreezyGame : Game
         // clicks only count inside the window, and not just after it lost or regained focus (clicking another window,
         // or clicking back into this one, used to open the turn menu)
         _activeFrames = IsActive || keyFuzz ? _activeFrames + 1 : 0;
+        // the option: silent while the window is in the background, heard again as soon as it's back
+        _audio.Unfocused = _settings.MuteWhenUnfocused && !IsActive && _opts.Screenshot is null;
         _pointerInside = keyFuzz || Window.ClientBounds is var cb && m.X >= 0 && m.Y >= 0 && m.X < cb.Width && m.Y < cb.Height;
         bool mouseHere = _activeFrames > 6 && _pointerInside;
         // the "mouse input" option off (modern): the mouse does nothing at all — no clicks, no wheel, no pointer, nothing

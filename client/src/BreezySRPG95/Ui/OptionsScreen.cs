@@ -282,6 +282,7 @@ public sealed class OptionsScreen
                 Level: () => _s.MusicVolume, SetLevel: v => _s.MusicVolume = v),
             new(T("SE Volume", "SEの音量"), () => "", d => _s.SoundVolume = Math.Clamp(_s.SoundVolume + 10 * d, 0, 100), Wheel: true,
                 Level: () => _s.SoundVolume, SetLevel: v => _s.SoundVolume = v),
+            Toggle(T("Mute When Not in Focus", "非アクティブ時はミュート"), () => _s.MuteWhenUnfocused, v => _s.MuteWhenUnfocused = v),
             Toggle(T("Combat BGM", "戦闘BGM"), () => _s.CombatBgm, v => _s.CombatBgm = v),
             Choice(T("Confirm Sound (Thunk)", "決定音"), () => new[] { T("On", "ON"), T("Gameplay Only", "メッセージ送り以外"), T("Off", "OFF") },
                 () => (int)_s.ConfirmSound, i => _s.ConfirmSound = (ConfirmSound)i),
