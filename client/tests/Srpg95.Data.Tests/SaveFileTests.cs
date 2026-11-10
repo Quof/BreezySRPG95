@@ -61,7 +61,7 @@ public class SaveFileTests
 
         var state = new GameState();
         save.ApplyTo(state);
-        Assert.Equal(new[] { 242, 243 }, state.Roster.Keys.Order());
+        Assert.Equal(new[] { 242, 243 }, state.Roster.Select(e => e.Unit).Order());
         Assert.Equal(1, state.ItemCount(40));                        // one ポーション
         Assert.Equal(10, state.Gold);
 
@@ -130,7 +130,7 @@ public class SaveFileTests
         Unit = r.Unit, Side = r.Computer ? Srpg95.Rules.Side.Enemy : Srpg95.Rules.Side.Ally, MapObject = r.Object,
         ClassId = r.ClassId, Level = r.Level, Exp = r.Exp, Base = r.Base, Hp = r.Hp, Mp = r.Mp,
         Weapon = r.Weapon, Armor = r.Armor, Accessory = r.Accessory, X = r.X, Y = r.Y, Acted = r.Acted, Dead = !r.Alive,
-        Cleared = !r.Alive, Slot = r.Record, Guest = r.Guest, FromRoster = r.FromRoster,
+        Cleared = !r.Alive, Slot = r.Record, Guest = r.Guest, RosterSlot = r.RosterSlot,
     }).ToList();
 
     /// <summary>The battle save the client writes for these units, on top of the original.</summary>

@@ -180,6 +180,7 @@ public sealed class CampScreen
     readonly MenuList _commands = new() { Rect = new Rectangle(288, 40, 108, 96), ItemWidth = 84 };
     readonly MenuList _list = new();
     readonly MenuList _confirm = new() { ItemWidth = 36 };
+    /// <summary>The army's rows: roster entries, by their place in the roster (one unit id can have several).</summary>
     readonly List<int> _unitIds = new();
     /// <summary>The chosen unit's row in the army (+0x5c64) and the army list's page.</summary>
     int _unitRow, _unitPage;
@@ -222,6 +223,7 @@ public sealed class CampScreen
 
     string W(int i) => i >= 0 && i < _db.Words.Length ? _db.Words[i] : "";
     int SortieMax => _next.StartPositions.Length;
+    /// <summary>The chosen roster entry (its place in the roster), −1 with an empty army.</summary>
     int Unit => _unitIds.Count > 0 ? _unitIds[Math.Clamp(_unitRow, 0, _unitIds.Count - 1)] : -1;
 
     /// <summary>"%-ns": padded with spaces to <paramref name="bytes"/> Shift-JIS bytes.</summary>
@@ -229,13 +231,13 @@ public sealed class CampScreen
     /// <summary>"%ns": spaces first, to <paramref name="bytes"/> Shift-JIS bytes.</summary>
     static string PadLeft(string s, int bytes) => new string(' ', Math.Max(0, bytes - Bin.Sjis.GetByteCount(s))) + s;
 
-    BattleUnit UnitOf(int id)
+    BattleUnit UnitOf(int slot)
     {
-        var e = _state.Roster[id];
-        var u = _db.Units[id];
+        var e = _state.Roster[slot];
+        var u = _db.Units[e.Unit];
         return new BattleUnit
         {
-            Unit = id, Side = Side.Ally, ClassId = e.ClassId, Level = e.Level, Exp = e.Exp, Base = e.Base, Growth = u.GrowthPct,
+            Unit = e.Unit, Side = Side.Ally, ClassId = e.ClassId, Level = e.Level, Exp = e.Exp, Base = e.Base, Growth = u.GrowthPct,
             Hp = e.Base[0], Mp = e.Base[1], Weapon = e.Weapon, Armor = e.Armor, Accessory = e.Accessory, Name = u.Name,
         };
     }
@@ -328,7 +330,7 @@ public sealed class CampScreen
     /// <summary>FUN_0041f6d4: 次のステージ once a unit is set to 出撃, ユニット編成 once there is an army, the rest always.</summary>
     void RefreshMenu() =>
         _menu.Set(new[] { W(24), W(25), W(26), W(27), W(21), W(22), OptionsLabel, W(23) },   // WORD.DAT 24-27, 21-22, the client's, 23
-            new[] { _state.Roster.Values.Any(e => e.Sortie), _state.Roster.Count > 0, true, true, true, true, true, true });
+            new[] { _state.Roster.Any(e => e.Sortie), _state.Roster.Count > 0, true, true, true, true, true, true });
 
     /// <summary>The menu's 環境設定 row, and its label in the language the options may just have changed.</summary>
     const int OptionsRow = 6;
@@ -374,7 +376,7 @@ public sealed class CampScreen
     void OpenUnits()
     {
         _unitIds.Clear();
-        _unitIds.AddRange(_state.Roster.Keys);
+        _unitIds.AddRange(Enumerable.Range(0, _state.Roster.Count));
         _unitRow = Math.Clamp(_unitRow, 0, Math.Max(0, _unitIds.Count - 1));
         _unitPage = _unitRow / ArmyRows;
         _commandKeys = _armyKeys = false;
@@ -451,8 +453,8 @@ public sealed class CampScreen
         if (_next.DisablePartyChanges || Unit < 0) return;
         int id = Unit;
         var e = _state.Roster[id];
-        if (!e.Sortie && _state.Roster.Values.Count(x => x.Sortie) < SortieMax) _state.Roster[id] = e with { Sortie = true };
-        else if (e.Sortie && !_next.CharacterList.Contains(id)) _state.Roster[id] = e with { Sortie = false };
+        if (!e.Sortie && _state.Roster.Count(x => x.Sortie) < SortieMax) _state.Roster[id] = e with { Sortie = true };
+        else if (e.Sortie && !_next.CharacterList.Contains(e.Unit)) _state.Roster[id] = e with { Sortie = false };
     }
 
     static readonly ItemType[] SlotTypes = { ItemType.Weapon, ItemType.Armor, ItemType.Accessory };
@@ -730,7 +732,7 @@ public sealed class CampScreen
             bool onName = _hoverRow == row ? !_hoverSortie : _hoverRow < 0 && _armyKeys && !_commandKeys && row == _unitRow;
             bool onSortie = _hoverRow == row && _hoverSortie;
             var cn = onName ? _ui.MenuRow(sb, NameRow(k), true, true, frame) : Ui.Ui.PanelText;
-            T(sb, _db.Units[id].Name, 100, 48 + 16 * k, cn);
+            T(sb, _db.Units[_state.Roster[id].Unit].Name, 100, 48 + 16 * k, cn);
             var cs = onSortie ? _ui.MenuRow(sb, SortieRow(k), true, true, frame) : Ui.Ui.PanelText;
             T(sb, _state.Roster[id].Sortie ? W(39) : W(40), 232, 48 + 16 * k, cs);   // 出撃 / ――
         }
@@ -743,7 +745,7 @@ public sealed class CampScreen
     {
         _ui.Panel(sb, new Rectangle(432, 40, 120, 48));
         T(sb, W(38), 444, 48, Ui.Ui.PanelText);
-        T(sb, $"{_state.Roster.Values.Count(e => e.Sortie),2}／{SortieMax,2}", 504, 64, Ui.Ui.PanelText);
+        T(sb, $"{_state.Roster.Count(e => e.Sortie),2}／{SortieMax,2}", 504, 64, Ui.Ui.PanelText);
     }
 
     /// <summary>FUN_00421030: the gold, 「%14d」 and 「,肉」, in a panel at (368,96), its text ending at x 548.</summary>

@@ -11,10 +11,11 @@ public sealed class GameState
     public int Gold { get; set; }
 
     /// <summary>
-    /// The player's army between maps (save-file roster, FORMAT_NOTES §14), by unit id. The original sorts it by
-    /// unit id at every map's end (FUN_0041d5e4), so the camp and the deployment follow unit-id order.
+    /// The player's army between maps (save-file roster, FORMAT_NOTES §14): up to 50 entries, as many of one unit id as
+    /// the game puts in (three soldiers of one UNIT.DAT record are three entries). The original sorts it by unit id at
+    /// every map's end (FUN_0041d5e4), so the camp and the deployment follow unit-id order; events add to its end.
     /// </summary>
-    public SortedDictionary<int, RosterEntry> Roster { get; } = new();
+    public List<RosterEntry> Roster { get; } = new();
 
     /// <summary>The map being played or the camp's map, 0-based (save header 0x004).</summary>
     public int MapIndex { get; set; }
@@ -94,8 +95,8 @@ public sealed class Inventory : IEnumerable<KeyValuePair<int, int>>
     System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
 }
 
-/// <summary>A party member's persistent state between maps.</summary>
-public sealed record RosterEntry(int ClassId, int Level, int Exp, int[] Base, int Weapon, int Armor, int Accessory)
+/// <summary>A party member's persistent state between maps: its UNIT.DAT record, class, level...</summary>
+public sealed record RosterEntry(int Unit, int ClassId, int Level, int Exp, int[] Base, int Weapon, int Armor, int Accessory)
 {
     /// <summary>出撃: goes onto the next map's start positions (record [13]).</summary>
     public bool Sortie { get; init; } = true;

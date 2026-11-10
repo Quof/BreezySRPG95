@@ -123,8 +123,10 @@ public sealed class MapSession : IMapContext
     /// <summary>The army: roster units with 出撃, in roster order, on the first start position no one holds yet.</summary>
     void DeployRoster()
     {
-        foreach (var (id, e) in _state.Roster)
+        for (int slot = 0; slot < _state.Roster.Count; slot++)
         {
+            var e = _state.Roster[slot];
+            int id = e.Unit;
             if (!e.Sortie) continue;
             var pos = Map.StartPositions.Where(p => Field.UnitAt(p.X, p.Y) is null).Select(p => ((int X, int Y)?)p).FirstOrDefault();
             if (pos is not { } p || FreeSlot() > MaxRecord) continue;
@@ -133,7 +135,7 @@ public sealed class MapSession : IMapContext
             {
                 Unit = id, Side = Side.Ally, Name = u.Name, ClassId = e.ClassId, Level = e.Level, Exp = e.Exp,
                 Base = (int[])e.Base.Clone(), Growth = u.GrowthPct, Hp = e.Base[0], Mp = e.Base[1],
-                Weapon = e.Weapon, Armor = e.Armor, Accessory = e.Accessory, X = p.X, Y = p.Y, Appeared = true, FromRoster = true,
+                Weapon = e.Weapon, Armor = e.Armor, Accessory = e.Accessory, X = p.X, Y = p.Y, Appeared = true, RosterSlot = slot,
             };
             unit.Slot = FreeSlot();
             Add(unit);
@@ -222,7 +224,7 @@ public sealed class MapSession : IMapContext
             (u.X, u.Y, u.Acted, u.Dead, u.Cleared) = (r.X, r.Y, r.Acted, r.Hp <= 0, !r.Alive);
             u.Side = r.Computer ? Side.Enemy : r.Neutral ? Side.Neutral : Side.Ally;
             u.Guest = r.Guest;
-            u.FromRoster = r.FromRoster;
+            u.RosterSlot = r.RosterSlot;
             (u.PowerUp, u.DefUp, u.MdefUp, u.PoisonTurns, u.SleepTurns) = (r.PowerUp, r.DefUp, r.MdefUp, r.PoisonTurns, r.SleepTurns);
             u.NoMoreTurns = r.NoMoreTurns;
             (u.Hidden, u.Appeared, u.Slot) = (false, true, r.Record);
@@ -257,7 +259,7 @@ public sealed class MapSession : IMapContext
     {
         var records = Field.Units.Where(u => u.Unit == unit && !u.Hidden).ToList();
         bool present = records.Any(u => !(u.Dead && u.Cleared));
-        bool player = records.Any(u => u.Side == Side.Ally) || _state.Roster.Keys.Skip(1).Contains(unit);
+        bool player = records.Any(u => u.Side == Side.Ally) || _state.Roster.Skip(1).Any(e => e.Unit == unit);
         return state switch
         {
             0 => present,

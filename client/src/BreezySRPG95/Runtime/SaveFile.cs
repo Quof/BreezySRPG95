@@ -90,7 +90,7 @@ public sealed class SaveFile
             int Rec(int k) => I32(off + k * 4);
             int unit = Rec(8);
             var bases = Enumerable.Range(20, 6).Select(Rec).ToArray();
-            s.Roster[unit] = new RosterEntry(Rec(9), Rec(10), Rec(11), bases, Rec(40), Rec(41), Rec(42)) { Sortie = Rec(13) != 0 };
+            s.Roster.Add(new RosterEntry(unit, Rec(9), Rec(10), Rec(11), bases, Rec(40), Rec(41), Rec(42)) { Sortie = Rec(13) != 0 });
         }
         s.LastSave = (byte[])Raw.Clone();
     }
@@ -128,21 +128,27 @@ public sealed class SaveFile
         for (int i = 0; i < 250; i++)
             BinaryPrimitives.WriteInt16LittleEndian(f.Raw.AsSpan(0x5DC + i * 2), (short)Math.Clamp(s.Variables[i], short.MinValue, short.MaxValue));
 
-        // roster: keep each unit's old record if the template had it (unknown fields), then patch the known ones
-        var old = new Dictionary<int, byte[]>();
+        // roster: keep each entry's old record if the template had it (unknown fields) — the n-th of a unit id's entries
+        // the n-th of its records — then patch the known ones
+        var old = new Dictionary<int, List<byte[]>>();
         for (int i = 0; i < RosterUnits; i++)
         {
             int off = RosterOff + i * UnitSize;
-            if (f.I32(off) != 0) old[f.I32(off + 32)] = f.Raw.AsSpan(off, UnitSize).ToArray();
+            if (f.I32(off) == 0) continue;
+            int id = f.I32(off + 32);
+            if (!old.TryGetValue(id, out var list)) old[id] = list = new();
+            list.Add(f.Raw.AsSpan(off, UnitSize).ToArray());
         }
         Array.Clear(f.Raw, RosterOff, RosterUnits * UnitSize);
+        var seen = new Dictionary<int, int>();
         int slot = 0;
-        foreach (var (unit, e) in s.Roster.Take(RosterUnits))
+        foreach (var e in s.Roster.Take(RosterUnits))
         {
             int off = RosterOff + slot++ * UnitSize;
-            bool had = old.TryGetValue(unit, out var rec);
-            if (had) rec!.CopyTo(f.Raw, off);
-            WriteUnit(f, off, db, unit, e, keepBattleState: had);
+            int nth = seen[e.Unit] = seen.GetValueOrDefault(e.Unit, -1) + 1;
+            bool had = old.TryGetValue(e.Unit, out var recs) && nth < recs.Count;
+            if (had) recs![nth].CopyTo(f.Raw, off);
+            WriteUnit(f, off, db, e.Unit, e, keepBattleState: had);
         }
         return f;
     }
@@ -195,11 +201,12 @@ public sealed class SaveFile
     public int Phase => I32(0x20C);
 
     /// <summary>
-    /// One map-unit record of a battle save (§14 fields): its record number, [3] computer, [14] guest, [15] neutral, [4] ≥ 0
-    /// holds a roster entry, [36]–[38] the buffs, [45] / [46] the poison and sleep counters, [12] no more actions this phase.
+    /// One map-unit record of a battle save (§14 fields): its record number, [3] computer, [14] guest, [15] neutral, [4] the
+    /// roster entry it holds (−1 none), [36]–[38] the buffs, [45] / [46] the poison and sleep counters, [12] no more
+    /// actions this phase.
     /// </summary>
     public sealed record SavedUnit(int Record, int Object, int Unit, int ClassId, int Level, int Exp, int[] Base, int Hp, int Mp,
-        int Weapon, int Armor, int Accessory, int X, int Y, bool Acted, bool Alive, bool Computer, bool Guest, bool Neutral, bool FromRoster,
+        int Weapon, int Armor, int Accessory, int X, int Y, bool Acted, bool Alive, bool Computer, bool Guest, bool Neutral, int RosterSlot,
         int PowerUp = 0, int DefUp = 0, int MdefUp = 0, int PoisonTurns = 0, int SleepTurns = 0, bool NoMoreTurns = false);
 
     /// <summary>The map units of a battle save, in record order (records start at index 1).</summary>
@@ -211,7 +218,7 @@ public sealed class SaveFile
             if (I32(off) == 0) continue;
             int R(int k) => I32(off + k * 4);
             yield return new SavedUnit(i, R(7), R(8), R(9), R(10), R(11), Enumerable.Range(20, 6).Select(R).ToArray(), R(26), R(27),
-                R(40), R(41), R(42), R(5), R(6), R(2) != 0, R(1) != 0, R(3) != 0, R(14) != 0, R(15) != 0, R(4) >= 0,
+                R(40), R(41), R(42), R(5), R(6), R(2) != 0, R(1) != 0, R(3) != 0, R(14) != 0, R(15) != 0, Math.Max(-1, R(4)),
                 R(36), R(37), R(38), R(45), R(46), R(12) != 0);
         }
     }
@@ -245,12 +252,11 @@ public sealed class SaveFile
         Array.Clear(f.Raw, UnitOff, MapUnits * UnitSize);
         var all = units.ToList();
         var onMap = all.Where(u => !u.Hidden && u.Slot is > 0 and < MapUnits).OrderBy(u => u.Slot).ToList();
-        var rosterOrder = s.Roster.Keys.ToList();
         foreach (var u in onMap)
         {
             // each unit at its own record number, as the exe keeps them
             int off = UnitOff + u.Slot * UnitSize;
-            WriteUnit(f, off, db, u.Unit, new RosterEntry(u.ClassId, u.Level, u.Exp, u.Base, u.Weapon, u.Armor, u.Accessory), keepBattleState: false);
+            WriteUnit(f, off, db, u.Unit, new RosterEntry(u.Unit, u.ClassId, u.Level, u.Exp, u.Base, u.Weapon, u.Armor, u.Accessory), keepBattleState: false);
             void R(int k, int v) => f.I32(off + k * 4, v);
             R(1, u.Dead && u.Cleared ? 0 : 1); R(2, u.Acted ? 1 : 0); R(3, u.Side == Srpg95.Rules.Side.Enemy ? 1 : 0); R(12, u.NoMoreTurns ? 1 : 0);
             R(5, u.X); R(6, u.Y); R(7, u.MapObject); R(13, u.MapObject < 0 ? 1 : 0);
@@ -258,7 +264,7 @@ public sealed class SaveFile
             R(26, Math.Max(0, u.Hp)); R(27, u.Mp); R(36, u.PowerUp); R(37, u.DefUp); R(38, u.MdefUp); R(45, u.PoisonTurns); R(46, u.SleepTurns);
             R(54, u.X); R(55, u.Y);
             // [4]: the unit's roster index when it holds a roster entry (ルーティ 0, ジュナ 1 in SAVE3), else −1
-            R(4, rosterOrder.IndexOf(u.Unit) is var ri && ri >= 0 && u.FromRoster ? ri : -1);
+            R(4, u.RosterSlot is var ri && ri >= 0 && ri < s.Roster.Count ? ri : -1);
             // [50] movement left: computer units only get theirs back on their own phase (0 during the player's, SAVE3)
             if (u.Side != Srpg95.Rules.Side.Ally && phase % 2 == 1) R(50, 0);
         }

@@ -343,7 +343,7 @@ public sealed class BreezyGame : Game
         int idx = _mapIndices[_mapPos];
         var map = MapData.Load(_folder.MapPath(idx));
         _state.MapIndex = idx;
-        if (_opts.Screenshot is not null) Trace($"{_frame}: map SMAP_{idx + 1:000} {map.Name} (army {_state.Roster.Count(kv => kv.Value.Sortie)}/{_state.Roster.Count})");
+        if (_opts.Screenshot is not null) Trace($"{_frame}: map SMAP_{idx + 1:000} {map.Name} (army {_state.Roster.Count(e => e.Sortie)}/{_state.Roster.Count})");
         if (resume is null) _state.NextMap = (idx + 1) % 100;   // FUN_0041d5e4: the following map unless a "Next Map" says otherwise
         // FUN_0041dc34: pictures go, brightness and tone stay; the screen fades in from −20 by 20 a tick (one black tick,
         // then 20 % steps) while the opening already runs; the tick becomes 30 ms and the mouse goes to (320, 256)
@@ -1790,7 +1790,7 @@ public sealed class BreezyGame : Game
         {
             GraphicsDevice.SetRenderTarget(null);
             using (var f = File.Create(shot)) _final.SaveAsPng(f, _final.Width, _final.Height);
-            File.WriteAllText(Path.ChangeExtension(shot, ".txt"), $"frame={_frame} script-left={_script.Count} {(_title is not null ? "Title" : _camp is not null ? $"Camp gold={_state.Gold} items={string.Join(",", _state.Items.Select(kv => $"{kv.Key}x{kv.Value}"))} roster={string.Join(",", _state.Roster.Select(kv => $"{kv.Key}:c{kv.Value.ClassId}/w{kv.Value.Weapon}/a{kv.Value.Armor}/x{kv.Value.Accessory}"))}" : _battle?.DebugState)}\n" + EventStateLines() + string.Join("\n", _trace) + "\n");
+            File.WriteAllText(Path.ChangeExtension(shot, ".txt"), $"frame={_frame} script-left={_script.Count} {(_title is not null ? "Title" : _camp is not null ? $"Camp gold={_state.Gold} items={string.Join(",", _state.Items.Select(kv => $"{kv.Key}x{kv.Value}"))} roster={string.Join(",", _state.Roster.Select(e => $"{e.Unit}:c{e.ClassId}/w{e.Weapon}/a{e.Armor}/x{e.Accessory}"))}" : _battle?.DebugState)}\n" + EventStateLines() + string.Join("\n", _trace) + "\n");
             Exit();
             return;
         }
@@ -1955,7 +1955,7 @@ public sealed class BreezyGame : Game
         var lines = new List<string>
         {
             $"SMAP_{_mapIndices[_mapPos] + 1:000} {_session?.Map.Name}  BGM {_audio.CurrentBgm ?? "-"}{(_audio.BgmMp3 is { } mp3 ? $" (MP3_File/{mp3})" : "")}  font {_ui.Text.FaceName}",
-            $"gold {_state.Gold}  roster {string.Join(",", _state.Roster.Select(kv => kv.Value.Sortie ? $"{kv.Key}*" : $"{kv.Key}"))}  next {_state.NextMap}  event {_runner?.Name} {(_runner?.Running == true ? "running" : "idle")}",
+            $"gold {_state.Gold}  roster {string.Join(",", _state.Roster.Select(e => e.Sortie ? $"{e.Unit}*" : $"{e.Unit}"))}  next {_state.NextMap}  event {_runner?.Name} {(_runner?.Running == true ? "running" : "idle")}",
         };
         lines.AddRange(_runner?.Log.TakeLast(8) ?? Enumerable.Empty<string>());
         _ui.Fill(_sb, new Rectangle(0, 0, VirtualWidth, 8 + lines.Count * 18), Color.Black * 0.75f);

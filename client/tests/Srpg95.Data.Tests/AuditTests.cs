@@ -96,15 +96,15 @@ public class AuditTests
         Assert.Equal(Side.Enemy, hans.Side);
         Party.Add(s, db, f, 244);
         Assert.Equal(Side.Ally, hans.Side);
-        Assert.True(s.Roster[244].Sortie);
-        Assert.Equal(hans.Level, s.Roster[244].Level);
+        Assert.True(s.Roster.First(e => e.Unit == 244).Sortie);
+        Assert.Equal(hans.Level, s.Roster.First(e => e.Unit == 244).Level);
 
         Party.Add(s, db, f, 224);                           // 紅葉 isn't on the map: straight from UNIT.DAT, 出撃 off
-        Assert.False(s.Roster[224].Sortie);
-        Assert.Equal(db.Units[224].Level, s.Roster[224].Level);
+        Assert.False(s.Roster.First(e => e.Unit == 224).Sortie);
+        Assert.Equal(db.Units[224].Level, s.Roster.First(e => e.Unit == 224).Level);
 
         Party.Remove(s, f, 244);                            // leaving: out of the roster, neutral on the map
-        Assert.False(s.Roster.ContainsKey(244));
+        Assert.DoesNotContain(s.Roster, e => e.Unit == 244);
         Assert.Equal(Side.Neutral, hans.Side);
     }
 
@@ -114,10 +114,10 @@ public class AuditTests
         if (Game() is null) return;
         var (s, db, f) = Map4();
         Party.Add(s, db, f, 244);
-        var before = s.Roster[244];
+        var before = s.Roster.First(e => e.Unit == 244);
         int to = Enumerable.Range(0, db.Classes.Length).First(c => c != before.ClassId && db.Classes[c].InitStats.Any(v => v != 0));
         Party.ChangeClass(s, db, f, 244, to);
-        var after = s.Roster[244];
+        var after = s.Roster.First(e => e.Unit == 244);
         var from = db.Classes[before.ClassId];
         for (int i = 0; i < 4; i++)
             Assert.Equal(Math.Clamp(before.Base[2 + i] + db.Classes[to].InitStats[i] - from.InitStats[i], 1, 30), after.Base[2 + i]);
@@ -132,10 +132,10 @@ public class AuditTests
         if (Game() is null) return;
         var (s, db, f) = Map4();
         Party.Add(s, db, f, 244);
-        var armor = db.Items.First(it => it.Type == ItemType.Armor && it.Index != s.Roster[244].Armor);
-        int old = s.Roster[244].Armor;
+        var armor = db.Items.First(it => it.Type == ItemType.Armor && it.Index != s.Roster.First(e => e.Unit == 244).Armor);
+        int old = s.Roster.First(e => e.Unit == 244).Armor;
         Party.ChangeEquipment(s, db, f, 244, armor.Index);
-        Assert.Equal(armor.Index, s.Roster[244].Armor);
+        Assert.Equal(armor.Index, s.Roster.First(e => e.Unit == 244).Armor);
         if (old >= 0) Assert.Equal(2, s.ItemCount(old));   // once for the roster entry, once for the unit on the map (as the exe)
     }
 
@@ -195,9 +195,9 @@ public class AuditTests
         var db = Database.Load(g);
         var next = MapData.Load(g.MapPath(16));   // SMAP_017: 3 start positions, character list ルーティ, ジュナ, セイナ
         var s = new GameState();
-        foreach (var id in new[] { 236, 237, 238, 239, 240, 242, 243 }) s.Roster[id] = Party.Fresh(db, id) with { Sortie = true };
+        foreach (var id in new[] { 236, 237, 238, 239, 240, 242, 243 }) s.Roster.Add(Party.Fresh(db, id) with { Sortie = true });
         Party.PrepareSortie(s, next);
-        var on = s.Roster.Where(kv => kv.Value.Sortie).Select(kv => kv.Key).ToList();
+        var on = s.Roster.Where(e => e.Sortie).Select(e => e.Unit).ToList();
         // the required ones always stay on; of the rest only the first ones in roster (unit id) order, up to the start
         // positions, keep it — as the exe trims, so a required unit can end up past the limit (the player fixes it at camp)
         Assert.Contains(242, on);
